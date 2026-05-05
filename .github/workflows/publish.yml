@@ -1,0 +1,25 @@
+name: Publish to Go module proxy
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Verify module on proxy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-go@v5
+        with:
+          go-version: stable
+
+      - name: Fetch module from proxy
+        run: |
+          VERSION="${{ github.event.release.tag_name }}"
+          GOPROXY="https://proxy.golang.org,direct" \
+          GONOSUMDB="*" \
+          go list -m "github.com/floci-io/testcontainers-floci-go@${VERSION}"
+          echo "Module github.com/floci-io/testcontainers-floci-go@${VERSION} is available on the Go proxy."
