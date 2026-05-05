@@ -1,10 +1,10 @@
 package s3_test
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"io"
+	"strings"
 	"testing"
 	"time"
 
@@ -58,7 +58,7 @@ func TestS3Example(t *testing.T) {
 	_, err = client.PutObject(ctx, &s3.PutObjectInput{
 		Bucket: aws.String(bucket),
 		Key:    aws.String("hello.txt"),
-		Body:   bytes.NewBufferString(body),
+		Body:   strings.NewReader(body),
 	})
 	if err != nil {
 		t.Fatalf("putting object: %v", err)
@@ -69,7 +69,7 @@ func TestS3Example(t *testing.T) {
 	_, err = client.PutObject(ctx, &s3.PutObjectInput{
 		Bucket: aws.String(bucket),
 		Key:    aws.String("world.txt"),
-		Body:   bytes.NewBufferString("Hello world!"),
+		Body:   strings.NewReader("Hello world!"),
 	})
 	if err != nil {
 		t.Fatalf("putting object: %v", err)
