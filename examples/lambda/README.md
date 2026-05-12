@@ -40,4 +40,4 @@ cfg, _ := config.LoadDefaultConfig(ctx,
 client := lambda.NewFromConfig(cfg)
 ```
 
-> **Note:** The handler is compiled for `linux/amd64`. On Apple Silicon the binary is built via Go's cross-compilation — no extra tooling needed since `CGO_ENABLED=0`.
+> **Note:** The handler is compiled for `linux/amd64` (`GOARCH=amd64`, `ArchitectureX8664`). Go's cross-compilation handles this transparently on any host — no extra tooling needed since `CGO_ENABLED=0`. If you need `arm64` Lambda support, change both `GOARCH` and the `Architectures` field to `ArchitectureArm64`.
