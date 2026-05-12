@@ -11,7 +11,7 @@ The test:
 ## Run
 
 ```bash
-go test -v -timeout 120s ./examples/dynamodb/...
+go test -v -timeout 300s ./examples/dynamodb/...
 ```
 
 ## Code walkthrough

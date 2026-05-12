@@ -13,7 +13,7 @@ The test:
 ## Run
 
 ```bash
-go test -v -timeout 120s ./examples/lambda/...
+go test -v -timeout 300s ./examples/lambda/...
 ```
 
 ## Code walkthrough
