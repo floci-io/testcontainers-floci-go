@@ -19,14 +19,12 @@ import (
 func TestS3Example(t *testing.T) {
 	ctx := context.Background()
 
-	// Start Floci
 	fc, err := floci.NewFlociContainer().Start(ctx)
 	if err != nil {
 		t.Fatalf("starting floci: %v", err)
 	}
 	t.Cleanup(func() { _ = fc.Stop(ctx) })
 
-	// Build an S3 client pointed at Floci
 	cfg, err := config.LoadDefaultConfig(ctx,
 		config.WithRegion(fc.GetRegion()),
 		config.WithBaseEndpoint(fc.GetEndpoint()),
@@ -44,7 +42,6 @@ func TestS3Example(t *testing.T) {
 
 	bucket := fmt.Sprintf("test-bucket-%d", time.Now().UnixMilli())
 
-	// Create bucket
 	_, err = client.CreateBucket(ctx, &s3.CreateBucketInput{
 		Bucket: aws.String(bucket),
 	})
@@ -53,7 +50,6 @@ func TestS3Example(t *testing.T) {
 	}
 	t.Logf("created bucket: %s", bucket)
 
-	// Upload a document
 	body := "Hello from Floci!"
 	_, err = client.PutObject(ctx, &s3.PutObjectInput{
 		Bucket: aws.String(bucket),
@@ -65,7 +61,6 @@ func TestS3Example(t *testing.T) {
 	}
 	t.Log("uploaded hello.txt")
 
-	// Upload a second document
 	_, err = client.PutObject(ctx, &s3.PutObjectInput{
 		Bucket: aws.String(bucket),
 		Key:    aws.String("world.txt"),
@@ -76,7 +71,6 @@ func TestS3Example(t *testing.T) {
 	}
 	t.Log("uploaded world.txt")
 
-	// List objects
 	list, err := client.ListObjectsV2(ctx, &s3.ListObjectsV2Input{
 		Bucket: aws.String(bucket),
 	})
@@ -86,14 +80,13 @@ func TestS3Example(t *testing.T) {
 
 	t.Logf("objects in %s:", bucket)
 	for _, obj := range list.Contents {
-		t.Logf("  - %s (%d bytes)", aws.ToString(obj.Key), obj.Size)
+		t.Logf("  - %s (%d bytes)", aws.ToString(obj.Key), aws.ToInt64(obj.Size))
 	}
 
 	if len(list.Contents) != 2 {
 		t.Errorf("expected 2 objects, got %d", len(list.Contents))
 	}
 
-	// Get object and verify content
 	resp, err := client.GetObject(ctx, &s3.GetObjectInput{
 		Bucket: aws.String(bucket),
 		Key:    aws.String("hello.txt"),
