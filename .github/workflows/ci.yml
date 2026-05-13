@@ -24,11 +24,14 @@ jobs:
         run: go vet ./...
 
   test:
-    name: Integration tests (Go ${{ matrix.go-version }})
+    name: Tests (Go ${{ matrix.go-version }} / tc ${{ matrix.tc-version }})
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     strategy:
+      fail-fast: false
       matrix:
         go-version: ["1.25", "stable"]
+        tc-version: ["v0.40.0", "v0.41.0", "v0.42.0"]
     steps:
       - uses: actions/checkout@v4
 
@@ -36,8 +39,13 @@ jobs:
         with:
           go-version: ${{ matrix.go-version }}
 
+      - name: Pin testcontainers-go
+        run: |
+          go get github.com/testcontainers/testcontainers-go@${{ matrix.tc-version }}
+          go mod tidy
+
       - name: Pull Floci image
         run: docker pull floci/floci:latest
 
       - name: Run tests
-        run: go test -v -timeout 120s ./...
+        run: go test -v -timeout 10m ./...
