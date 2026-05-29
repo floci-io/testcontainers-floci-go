@@ -7,10 +7,10 @@ import (
 	floci "github.com/floci-io/testcontainers-floci-go"
 )
 
-func TestFlociContainer_DefaultConfig(t *testing.T) {
+func TestRun_DefaultConfig(t *testing.T) {
 	ctx := context.Background()
 
-	container, err := floci.NewFlociContainer().Start(ctx)
+	container, err := floci.Run(ctx)
 	if err != nil {
 		t.Fatalf("starting container: %v", err)
 	}
@@ -38,12 +38,12 @@ func TestFlociContainer_DefaultConfig(t *testing.T) {
 	t.Logf("endpoint: %s", container.GetEndpoint())
 }
 
-func TestFlociContainer_CustomRegion(t *testing.T) {
+func TestRun_CustomRegion(t *testing.T) {
 	ctx := context.Background()
 
-	container, err := floci.NewFlociContainer().
-		WithRegion("eu-west-1").
-		Start(ctx)
+	container, err := floci.Run(ctx, func(c *floci.FlociContainer) {
+		c.WithRegion("eu-west-1")
+	})
 	if err != nil {
 		t.Fatalf("starting container: %v", err)
 	}
@@ -54,12 +54,12 @@ func TestFlociContainer_CustomRegion(t *testing.T) {
 	}
 }
 
-func TestFlociContainer_DedicatedNetwork(t *testing.T) {
+func TestRun_DedicatedNetwork(t *testing.T) {
 	ctx := context.Background()
 
-	container, err := floci.NewFlociContainer().
-		WithDedicatedNetwork().
-		Start(ctx)
+	container, err := floci.Run(ctx, func(c *floci.FlociContainer) {
+		c.WithDedicatedNetwork()
+	})
 	if err != nil {
 		t.Fatalf("starting container: %v", err)
 	}
@@ -71,21 +71,21 @@ func TestFlociContainer_DedicatedNetwork(t *testing.T) {
 	t.Logf("network: %s", container.GetDedicatedNetworkName())
 }
 
-func TestFlociContainer_ServiceConfigs(t *testing.T) {
+func TestRun_ServiceConfigs(t *testing.T) {
 	ctx := context.Background()
 
-	container, err := floci.NewFlociContainer().
-		WithS3Config(floci.S3Config{
+	container, err := floci.Run(ctx, func(c *floci.FlociContainer) {
+		c.WithS3Config(floci.S3Config{
 			Enabled:                     true,
 			DefaultPresignExpirySeconds: 7200,
-		}).
-		WithSqsConfig(floci.SqsConfig{
+		})
+		c.WithSqsConfig(floci.SqsConfig{
 			Enabled:                  true,
 			DefaultVisibilityTimeout: 60,
 			MaxMessageSize:           131072,
-		}).
-		WithDynamoDbConfig(floci.DynamoDbConfig{Enabled: true}).
-		Start(ctx)
+		})
+		c.WithDynamoDbConfig(floci.DynamoDbConfig{Enabled: true})
+	})
 	if err != nil {
 		t.Fatalf("starting container: %v", err)
 	}

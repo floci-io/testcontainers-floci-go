@@ -19,7 +19,7 @@ go test -v -timeout 120s ./examples/s3/...
 
 ```go
 // Start Floci
-fc, err := floci.NewFlociContainer().Start(ctx)
+fc, err := floci.Run(ctx)
 defer fc.Stop(ctx)
 
 // Wire up the AWS SDK S3 client

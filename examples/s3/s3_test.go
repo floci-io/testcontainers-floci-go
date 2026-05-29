@@ -20,7 +20,7 @@ func TestS3Example(t *testing.T) {
 	ctx := context.Background()
 
 	// Start Floci
-	fc, err := floci.NewFlociContainer().Start(ctx)
+	fc, err := floci.Run(ctx)
 	if err != nil {
 		t.Fatalf("starting floci: %v", err)
 	}

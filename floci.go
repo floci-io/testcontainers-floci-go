@@ -2,15 +2,15 @@
 //
 // Example:
 //
-//	floci, err := floci.NewFlociContainer().Start(ctx)
+//	fc, err := floci.Run(ctx)
 //	if err != nil { ... }
-//	defer floci.Stop(ctx)
+//	defer fc.Stop(ctx)
 //
 //	cfg, _ := config.LoadDefaultConfig(ctx,
-//	    config.WithRegion(floci.GetRegion()),
-//	    config.WithBaseEndpoint(floci.GetEndpoint()),
+//	    config.WithRegion(fc.GetRegion()),
+//	    config.WithBaseEndpoint(fc.GetEndpoint()),
 //	    config.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(
-//	        floci.GetAccessKey(), floci.GetSecretKey(), "",
+//	        fc.GetAccessKey(), fc.GetSecretKey(), "",
 //	    )),
 //	)
 package floci
@@ -147,6 +147,26 @@ func NewFlociContainer() *FlociContainer {
 	c.withEnv("FLOCI_DEFAULT_AVAILABILITY_ZONE", DefaultAvailabilityZone)
 	c.applyAllConfigs()
 	return c
+}
+
+// Option is a functional option for configuring a FlociContainer.
+type Option func(*FlociContainer)
+
+// Run creates and starts a Floci container, applying the provided options.
+// It is the recommended entry point for starting Floci in tests.
+//
+//	fc, err := floci.Run(ctx)
+//
+//	fc, err := floci.Run(ctx, func(c *floci.FlociContainer) {
+//	    c.WithRegion("eu-west-1")
+//	    c.WithS3Config(floci.S3Config{Enabled: true})
+//	})
+func Run(ctx context.Context, opts ...Option) (*StartedFlociContainer, error) {
+	c := NewFlociContainer()
+	for _, opt := range opts {
+		opt(c)
+	}
+	return c.Start(ctx)
 }
 
 func (c *FlociContainer) withEnv(key, value string) *FlociContainer {
