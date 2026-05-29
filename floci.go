@@ -33,7 +33,7 @@ const (
 	defaultImage   = "floci/floci:latest"
 	dockerSocket   = "/var/run/docker.sock"
 	flociPort      = 4566
-	startupTimeout = 30 * time.Second
+	startupTimeout = 120 * time.Second
 
 	DefaultRegion           = "us-east-1"
 	DefaultAvailabilityZone = "us-east-1a"

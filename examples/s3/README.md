@@ -12,7 +12,7 @@ The test:
 ## Run
 
 ```bash
-go test -v -timeout 120s ./examples/s3/...
+go test -v -timeout 300s ./examples/s3/...
 ```
 
 ## Code walkthrough

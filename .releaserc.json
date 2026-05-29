@@ -1,5 +1,5 @@
 {
-  "tagFormat": "${version}",
+  "tagFormat": "v${version}",
   "branches": [
     {
       "name": "release/+([0-9])?(.{+([0-9]),x}).x",
