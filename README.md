@@ -1,6 +1,5 @@
 # testcontainers-floci-go
 
-<<<<<<< HEAD
 [![Go Reference](https://pkg.go.dev/badge/github.com/floci-io/testcontainers-floci-go.svg)](https://pkg.go.dev/github.com/floci-io/testcontainers-floci-go)
 [![CI](https://github.com/floci-io/testcontainers-floci-go/actions/workflows/ci.yml/badge.svg)](https://github.com/floci-io/testcontainers-floci-go/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -22,29 +21,12 @@ go get github.com/floci-io/testcontainers-floci-go
 Requires Go 1.25+ and a running Docker daemon.
 
 ## Quick start
-=======
-A [Testcontainers](https://testcontainers.com) module for [Floci](https://floci.io) — a free, open-source local AWS emulator.
-
-## Requirements
-
-- Go 1.25+ (current latest; required by `testcontainers-go v0.42.0` — if you need Go 1.22/1.23/1.24 support, pin an older version of this module)
-- Docker
-
-## Installation
-
-```sh
-go get github.com/floci-io/testcontainers-floci-go
-```
-
-## Quickstart
->>>>>>> main
 
 ```go
 package myservice_test
 
 import (
     "context"
-<<<<<<< HEAD
     "strings"
     "testing"
 
@@ -57,25 +39,11 @@ import (
 )
 
 func TestS3(t *testing.T) {
-=======
-    "testing"
-
-    "github.com/aws/aws-sdk-go-v2/config"
-    "github.com/aws/aws-sdk-go-v2/credentials"
-    floci "github.com/floci-io/testcontainers-floci-go"
-)
-
-func TestMyService(t *testing.T) {
->>>>>>> main
     ctx := context.Background()
 
     fc, err := floci.NewFlociContainer().Start(ctx)
     if err != nil {
-<<<<<<< HEAD
         t.Fatal(err)
-=======
-        t.Fatalf("starting floci: %v", err)
->>>>>>> main
     }
     t.Cleanup(func() { _ = fc.Stop(ctx) })
 
@@ -87,7 +55,6 @@ func TestMyService(t *testing.T) {
         )),
     )
     if err != nil {
-<<<<<<< HEAD
         t.Fatal(err)
     }
 
@@ -164,28 +131,10 @@ Each of Floci's 42 services can be configured individually using typed config st
 
 ```go
 fc, _ := floci.NewFlociContainer().
-=======
-        t.Fatalf("loading AWS config: %v", err)
-    }
-
-    // Use cfg to build any aws-sdk-go-v2 client (S3, SQS, DynamoDB, etc.)
-    _ = cfg
-}
-```
-
-## Configuration
-
-All services are enabled by default. Use `With<Service>Config` to tune or disable specific services:
-
-```go
-fc, err := floci.NewFlociContainer().
-    WithRegion("eu-west-1").
->>>>>>> main
     WithS3Config(floci.S3Config{
         Enabled:                     true,
         DefaultPresignExpirySeconds: 7200,
     }).
-<<<<<<< HEAD
     Start(ctx)
 ```
 
@@ -197,17 +146,10 @@ fc, _ := floci.NewFlociContainer().
         Enabled:                  true,
         DefaultVisibilityTimeout: 60,
         MaxMessageSize:           262144,
-=======
-    WithSqsConfig(floci.SqsConfig{
-        Enabled:                  true,
-        DefaultVisibilityTimeout: 60,
-        MaxMessageSize:           131072,
->>>>>>> main
     }).
     Start(ctx)
 ```
 
-<<<<<<< HEAD
 ### DynamoDB
 
 ```go
@@ -226,23 +168,11 @@ fc, _ := floci.NewFlociContainer().
         DefaultMemoryMb:       256,
         DefaultTimeoutSeconds: 30,
         HotReloadEnabled:      true,
-=======
-### Container-based services (Lambda, RDS, ElastiCache, etc.)
-
-Services that spin up their own Docker containers need a shared network:
-
-```go
-fc, err := floci.NewFlociContainer().
-    WithDedicatedNetwork().
-    WithLambdaConfig(floci.LambdaConfig{
-        Enabled:            true,
-        ExposeRuntimePorts: true,
->>>>>>> main
+        ExposeRuntimePorts:    true, // invoke Lambdas from the host
     }).
     Start(ctx)
 ```
 
-<<<<<<< HEAD
 ### RDS (PostgreSQL / MySQL / MariaDB)
 
 ```go
@@ -396,6 +326,18 @@ The network is removed when `Stop` is called.
 ## Examples
 
 - [`examples/s3`](examples/s3/) — create a bucket, upload documents, list objects
+- [`examples/dynamodb`](examples/dynamodb/) — DynamoDB tables and items
+- [`examples/sqs`](examples/sqs/) — queues, send and receive messages
+- [`examples/sns`](examples/sns/) — topics and subscriptions
+- [`examples/lambda`](examples/lambda/) — deploy and invoke a function
+
+## Running the tests
+
+```bash
+go test -v ./...
+```
+
+Requires Docker running locally; the `floci/floci:latest` image is pulled automatically on first run.
 
 ## Related projects
 
@@ -408,68 +350,3 @@ The network is removed when `Stop` is called.
 ## License
 
 MIT
-=======
-## Supported services
-
-| Service | Config type |
-|---|---|
-| ACM | `AcmConfig` |
-| API Gateway | `ApiGatewayConfig` / `ApiGatewayV2Config` |
-| AppConfig | `AppConfigConfig` / `AppConfigDataConfig` |
-| Athena | `AthenaConfig` |
-| Bedrock Runtime | `BedrockRuntimeConfig` |
-| CloudFormation | `CloudFormationConfig` |
-| CloudWatch Logs | `CloudWatchLogsConfig` |
-| CloudWatch Metrics | `CloudWatchMetricsConfig` |
-| CodeBuild | `CodeBuildConfig` |
-| CodeDeploy | `CodeDeployConfig` |
-| Cognito | `CognitoConfig` |
-| DynamoDB | `DynamoDbConfig` |
-| EC2 | `Ec2Config` |
-| ECR | `EcrConfig` |
-| ECS | `EcsConfig` |
-| EKS | `EksConfig` |
-| ElastiCache | `ElastiCacheConfig` |
-| ELBv2 | `ElbV2Config` |
-| EventBridge | `EventBridgeConfig` |
-| Firehose | `FirehoseConfig` |
-| Glue | `GlueConfig` |
-| IAM | `IamConfig` |
-| Kinesis | `KinesisConfig` |
-| KMS | `KmsConfig` |
-| Lambda | `LambdaConfig` |
-| MSK | `MskConfig` |
-| OpenSearch | `OpenSearchConfig` |
-| Pipes | `PipesConfig` |
-| RDS | `RdsConfig` |
-| Resource Groups Tagging | `ResourceGroupsTaggingConfig` |
-| S3 | `S3Config` |
-| Scheduler | `SchedulerConfig` |
-| Secrets Manager | `SecretsManagerConfig` |
-| SES | `SesConfig` / `SesV2Config` |
-| SNS | `SnsConfig` |
-| SQS | `SqsConfig` |
-| SSM | `SsmConfig` |
-| Step Functions | `StepFunctionsConfig` |
-
-## Examples
-
-- [S3](examples/s3/s3_test.go)
-- [DynamoDB](examples/dynamodb/dynamodb_test.go)
-- [SQS](examples/sqs/sqs_test.go)
-- [SNS](examples/sns/sns_test.go)
-- [Lambda](examples/lambda/lambda_test.go)
-
-## Running the tests
-
-```sh
-go test -v ./...
-```
-
-> Requires Docker running locally and the `floci/floci:latest` image available (pulled automatically on first run).
-
-## Reference
-
-- Java module: [testcontainers-floci](https://github.com/floci-io/testcontainers-floci)
-- Floci documentation: [floci.io](https://floci.io)
->>>>>>> main
