@@ -207,6 +207,12 @@ type EcrConfig struct {
 	RegistryImage     string
 	RegistryBasePort  int
 	RegistryPortCount int
+	// ExposeRegistryPorts publishes ports [RegistryBasePort,
+	// RegistryBasePort+RegistryPortCount) to the host. Enable it only when the
+	// registry must be reachable from the host: every published port adds load
+	// to Docker's port forwarder, and publishing hundreds by default makes
+	// container startup slow and flaky.
+	ExposeRegistryPorts bool
 }
 
 func DefaultEcrConfig() EcrConfig {
@@ -225,8 +231,10 @@ func (c EcrConfig) applyEnvVars(t *FlociContainer) {
 }
 
 func (c EcrConfig) applyExposedPorts(t *FlociContainer) {
-	for i := range c.RegistryPortCount {
-		t.withPort(c.RegistryBasePort + i)
+	if c.ExposeRegistryPorts {
+		for i := range c.RegistryPortCount {
+			t.withPort(c.RegistryBasePort + i)
+		}
 	}
 }
 
@@ -244,7 +252,7 @@ func (c EcsConfig) applyEnvVars(t *FlociContainer) {
 }
 
 // EksConfig configures the EKS service.
-// When enabled, ports [ApiServerBasePort, ApiServerBasePort+ApiServerPortCount) are exposed.
+// Set ExposeApiServerPorts=true to reach cluster API servers from the host.
 type EksConfig struct {
 	Enabled            bool
 	Mock               bool
@@ -252,6 +260,9 @@ type EksConfig struct {
 	DefaultImage       string
 	ApiServerBasePort  int
 	ApiServerPortCount int
+	// ExposeApiServerPorts publishes ports [ApiServerBasePort,
+	// ApiServerBasePort+ApiServerPortCount) to the host.
+	ExposeApiServerPorts bool
 }
 
 func DefaultEksConfig() EksConfig {
@@ -274,18 +285,23 @@ func (c EksConfig) applyEnvVars(t *FlociContainer) {
 }
 
 func (c EksConfig) applyExposedPorts(t *FlociContainer) {
-	for i := range c.ApiServerPortCount {
-		t.withPort(c.ApiServerBasePort + i)
+	if c.ExposeApiServerPorts {
+		for i := range c.ApiServerPortCount {
+			t.withPort(c.ApiServerBasePort + i)
+		}
 	}
 }
 
 // ElastiCacheConfig configures the ElastiCache service.
-// Ports [ProxyBasePort, ProxyBasePort+ProxyPortCount) are exposed.
+// Set ExposeProxyPorts=true to reach cache proxies from the host.
 type ElastiCacheConfig struct {
 	Enabled        bool
 	DefaultImage   string
 	ProxyBasePort  int
 	ProxyPortCount int
+	// ExposeProxyPorts publishes ports [ProxyBasePort,
+	// ProxyBasePort+ProxyPortCount) to the host.
+	ExposeProxyPorts bool
 }
 
 func DefaultElastiCacheConfig() ElastiCacheConfig {
@@ -304,8 +320,10 @@ func (c ElastiCacheConfig) applyEnvVars(t *FlociContainer) {
 }
 
 func (c ElastiCacheConfig) applyExposedPorts(t *FlociContainer) {
-	for i := range c.ProxyPortCount {
-		t.withPort(c.ProxyBasePort + i)
+	if c.ExposeProxyPorts {
+		for i := range c.ProxyPortCount {
+			t.withPort(c.ProxyBasePort + i)
+		}
 	}
 }
 
@@ -457,13 +475,16 @@ func (c MskConfig) applyEnvVars(t *FlociContainer) {
 }
 
 // OpenSearchConfig configures the OpenSearch service.
-// Ports [ProxyBasePort, ProxyBasePort+ProxyPortCount) are exposed.
+// Set ExposeProxyPorts=true to reach OpenSearch proxies from the host.
 type OpenSearchConfig struct {
 	Enabled        bool
 	Mock           bool
 	DefaultImage   string
 	ProxyBasePort  int
 	ProxyPortCount int
+	// ExposeProxyPorts publishes ports [ProxyBasePort,
+	// ProxyBasePort+ProxyPortCount) to the host.
+	ExposeProxyPorts bool
 }
 
 func DefaultOpenSearchConfig() OpenSearchConfig {
@@ -484,8 +505,10 @@ func (c OpenSearchConfig) applyEnvVars(t *FlociContainer) {
 }
 
 func (c OpenSearchConfig) applyExposedPorts(t *FlociContainer) {
-	for i := range c.ProxyPortCount {
-		t.withPort(c.ProxyBasePort + i)
+	if c.ExposeProxyPorts {
+		for i := range c.ProxyPortCount {
+			t.withPort(c.ProxyBasePort + i)
+		}
 	}
 }
 
@@ -501,7 +524,7 @@ func (c PipesConfig) applyEnvVars(t *FlociContainer) {
 }
 
 // RdsConfig configures the RDS service.
-// Ports [ProxyBasePort, ProxyBasePort+ProxyPortCount) are exposed for direct DB access.
+// Set ExposeProxyPorts=true for direct DB access from the host.
 type RdsConfig struct {
 	Enabled              bool
 	ProxyBasePort        int
@@ -509,6 +532,9 @@ type RdsConfig struct {
 	DefaultPostgresImage string
 	DefaultMysqlImage    string
 	DefaultMariadbImage  string
+	// ExposeProxyPorts publishes ports [ProxyBasePort,
+	// ProxyBasePort+ProxyPortCount) to the host.
+	ExposeProxyPorts bool
 }
 
 func DefaultRdsConfig() RdsConfig {
@@ -531,8 +557,10 @@ func (c RdsConfig) applyEnvVars(t *FlociContainer) {
 }
 
 func (c RdsConfig) applyExposedPorts(t *FlociContainer) {
-	for i := range c.ProxyPortCount {
-		t.withPort(c.ProxyBasePort + i)
+	if c.ExposeProxyPorts {
+		for i := range c.ProxyPortCount {
+			t.withPort(c.ProxyBasePort + i)
+		}
 	}
 }
 
