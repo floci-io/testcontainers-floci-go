@@ -641,6 +641,9 @@ func (c *FlociContainer) applyAllConfigs() {
 }
 
 func (c *FlociContainer) refreshExposedPorts() {
+	// Rebuild from scratch so re-applying a config with an Expose flag turned
+	// off also removes the ports it previously added.
+	c.ports = map[int]struct{}{flociPort: {}}
 	c.ecrConfig.applyExposedPorts(c)
 	c.eksConfig.applyExposedPorts(c)
 	c.elastiCacheConfig.applyExposedPorts(c)
