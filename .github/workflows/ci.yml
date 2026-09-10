@@ -31,7 +31,8 @@ jobs:
       fail-fast: false
       matrix:
         go-version: ["1.25", "stable"]
-        tc-version: ["v0.40.0", "v0.41.0", "v0.42.0"]
+        # v0.42.0+ only: the moby/moby migration in v0.42.0 breaks compilation against older releases
+        tc-version: ["v0.42.0", "v0.43.0", "v0.44.0"]
     steps:
       - uses: actions/checkout@v4
 
