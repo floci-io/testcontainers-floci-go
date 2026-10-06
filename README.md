@@ -1,16 +1,50 @@
-# testcontainers-floci-go
+<p align="center">
+  <img src="https://raw.githubusercontent.com/floci-io/.github/main/floci.svg#gh-light-mode-only" alt="Floci" width="500" />
+  <img src="https://github.com/user-attachments/assets/edfff8b3-926c-471e-9549-77fb90a21b49#gh-dark-mode-only" alt="Floci" width="500" />
+</p>
 
-[![Go Reference](https://pkg.go.dev/badge/github.com/floci-io/testcontainers-floci-go.svg)](https://pkg.go.dev/github.com/floci-io/testcontainers-floci-go)
-[![CI](https://github.com/floci-io/testcontainers-floci-go/actions/workflows/ci.yml/badge.svg)](https://github.com/floci-io/testcontainers-floci-go/actions/workflows/ci.yml)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+<p align="center">
+  <strong>Any Cloud. Locally.</strong><br />
+  Light, fluffy, and always free: Testcontainers for Go<br />
+  No account. No auth token. No feature gates.
+</p>
 
-Go [Testcontainers](https://testcontainers.com) module for [Floci](https://github.com/floci-io/floci) — the open-source, drop-in replacement for LocalStack Community Edition.
+<p align="center">
+  <a href="https://pkg.go.dev/github.com/floci-io/testcontainers-floci-go"><img src="https://pkg.go.dev/badge/github.com/floci-io/testcontainers-floci-go.svg" alt="Go Reference"></a>
+  <a href="https://github.com/floci-io/testcontainers-floci-go/actions/workflows/ci.yml"><img src="https://github.com/floci-io/testcontainers-floci-go/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI"></a>
+  <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/license-MIT-green" alt="License: MIT"></a>
+  <a href="https://github.com/floci-io/testcontainers-floci-go/stargazers"><img src="https://img.shields.io/github/stars/floci-io/testcontainers-floci-go?style=flat" alt="GitHub Stars"></a>
+</p>
 
-Floci emulates **42 AWS services** in a single container with:
-- **~24 ms** startup time (native image)
-- **~13 MiB** idle memory
-- **~90 MB** Docker image
-- No auth tokens, no feature gates, MIT license
+<p align="center">
+  <a href="#quick-start">Quick Start</a> ·
+  <a href="#service-configuration">Configuration</a> ·
+  <a href="#the-floci-emulators">Emulators</a> ·
+  <a href="https://floci.io/floci/testcontainers/go/">Docs</a>
+</p>
+
+---
+
+## What is this?
+
+A [Testcontainers for Go](https://golang.testcontainers.org) module for [Floci](https://github.com/floci-io), the free,
+open-source local cloud emulators. The `floci` package starts a Floci (AWS) container for your integration tests and
+gives you an endpoint and credentials to point the AWS SDK for Go v2 at, plus typed, per-service configuration structs
+over the emulator's environment variables. No cloud account, no auth token.
+
+See the [Floci documentation](https://floci.io/floci/services/) for the full list of supported AWS services.
+
+### The Floci emulators
+
+testcontainers-floci-go is the Go member of the [Floci](https://github.com/floci-io) Testcontainers family. Floci is
+named after [floccus](https://en.wikipedia.org/wiki/Cirrocumulus_floccus), the cloud formation that looks like popcorn.
+
+| Emulator                                           | Cloud | Port | Supported                                                                                  |
+|----------------------------------------------------|-------|:----:|:------------------------------------------------------------------------------------------:|
+| [floci](https://github.com/floci-io/floci)         | AWS   | 4566 | ✅ [`floci` package](https://pkg.go.dev/github.com/floci-io/testcontainers-floci-go)        |
+| [floci-az](https://github.com/floci-io/floci-az)   | Azure | 4577 | Planned                                                                                    |
+| [floci-gcp](https://github.com/floci-io/floci-gcp) | GCP   | 4588 | Planned                                                                                    |
+| [floci-oci](https://github.com/floci-io/floci-oci) | OCI   | 4599 | Planned                                                                                    |
 
 ## Installation
 
@@ -18,7 +52,7 @@ Floci emulates **42 AWS services** in a single container with:
 go get github.com/floci-io/testcontainers-floci-go
 ```
 
-Requires Go 1.25+ and a running Docker daemon.
+The module path is `github.com/floci-io/testcontainers-floci-go`; the package name is `floci`.
 
 ## Quick start
 
@@ -93,7 +127,11 @@ func TestS3(t *testing.T) {
 > `bytes.NewBufferString` is not seekable and causes the AWS SDK to attempt trailing checksums,
 > which require TLS and fail against a plain HTTP local endpoint.
 
-## Sharing a container across tests
+> **S3 note:** always use `strings.NewReader` or `bytes.NewReader` (seekable) when uploading objects.
+> `bytes.NewBufferString` is not seekable and causes the AWS SDK to attempt trailing checksums,
+> which require TLS and fail against a plain HTTP local endpoint.
+
+### Sharing a container across tests
 
 Use `TestMain` to start the container once for the whole package:
 
@@ -123,11 +161,23 @@ func TestMain(m *testing.M) {
 }
 ```
 
+### Examples
+
+- [`examples/s3`](examples/s3/) — create a bucket, upload documents, list objects
+- [`examples/dynamodb`](examples/dynamodb/) — DynamoDB tables and items
+- [`examples/sqs`](examples/sqs/) — queues, send and receive messages
+- [`examples/sns`](examples/sns/) — topics and subscriptions
+- [`examples/lambda`](examples/lambda/) — deploy and invoke a function
+
 ## Service configuration
 
-Each of Floci's 42 services can be configured individually using typed config structs. Pass any struct to the corresponding `With*Config` method — unset fields keep their defaults.
+Each AWS service emulated by Floci can be configured individually using a typed config struct. Pass the struct to the
+corresponding `With*Config` method; unset fields keep their defaults. See the
+[Floci documentation](https://floci.io/floci/services/) for the full list of supported services.
 
-### S3
+### Per-service examples
+
+#### S3
 
 ```go
 fc, _ := floci.NewFlociContainer().
@@ -138,7 +188,7 @@ fc, _ := floci.NewFlociContainer().
     Start(ctx)
 ```
 
-### SQS
+#### SQS
 
 ```go
 fc, _ := floci.NewFlociContainer().
@@ -150,7 +200,7 @@ fc, _ := floci.NewFlociContainer().
     Start(ctx)
 ```
 
-### DynamoDB
+#### DynamoDB
 
 ```go
 fc, _ := floci.NewFlociContainer().
@@ -158,7 +208,7 @@ fc, _ := floci.NewFlociContainer().
     Start(ctx)
 ```
 
-### Lambda
+#### Lambda
 
 ```go
 fc, _ := floci.NewFlociContainer().
@@ -173,7 +223,7 @@ fc, _ := floci.NewFlociContainer().
     Start(ctx)
 ```
 
-### RDS (PostgreSQL / MySQL / MariaDB)
+#### RDS (PostgreSQL / MySQL / MariaDB)
 
 ```go
 fc, _ := floci.NewFlociContainer().
@@ -185,7 +235,7 @@ fc, _ := floci.NewFlociContainer().
     Start(ctx)
 ```
 
-### ElastiCache (Redis / Valkey)
+#### ElastiCache (Redis / Valkey)
 
 ```go
 fc, _ := floci.NewFlociContainer().
@@ -197,7 +247,7 @@ fc, _ := floci.NewFlociContainer().
     Start(ctx)
 ```
 
-### OpenSearch
+#### OpenSearch
 
 ```go
 fc, _ := floci.NewFlociContainer().
@@ -209,7 +259,7 @@ fc, _ := floci.NewFlociContainer().
     Start(ctx)
 ```
 
-### MSK (Kafka via Redpanda)
+#### MSK (Kafka via Redpanda)
 
 ```go
 fc, _ := floci.NewFlociContainer().
@@ -292,7 +342,7 @@ fc, _ := floci.NewFlociContainer().
 | `GetDedicatedNetworkName()` | Docker network name (empty if none) |
 | `GetMappedPort(ctx, port)` | Host port mapped from the given container port |
 
-## Dedicated network
+### Dedicated network
 
 Services that spawn real Docker containers (Lambda, RDS, ElastiCache, MSK, OpenSearch, ECR, EKS) need a Docker network to communicate with Floci. Call `WithDedicatedNetwork()` to have the module create and manage one automatically:
 
@@ -308,45 +358,68 @@ fc, _ := floci.NewFlociContainer().
 
 The network is removed when `Stop` is called.
 
-## Docker image variants
+## Docker image tags
+
+By default the module runs the floating `latest` tag of the emulator image (`floci/floci:latest`), so you always test
+against the current emulator. Use `WithImage` to pin a release or follow `main`:
+
+```go
+floci.NewFlociContainer().WithImage("floci/floci:x.y.z")   // a specific release
+floci.NewFlociContainer().WithImage("floci/floci:nightly") // built from main every night
+```
+
+Every emulator publishes `latest`, `x.y.z` and `nightly` tags. The AWS emulator also publishes a compat variant:
 
 | Tag | Description |
 |---|---|
-| `floci/floci:latest` | Native image — sub-second startup (recommended) |
+| `floci/floci:latest` | Native image (default, recommended) |
 | `floci/floci:x.y.z` | Pinned release |
-| `floci/floci:latest-compat` | Includes Python 3, AWS CLI, and boto3 |
 | `floci/floci:nightly` | Latest nightly build from `main` |
+| `floci/floci:latest-compat` | Includes Python 3, AWS CLI, and boto3 |
 
 ## Requirements
 
 - Go 1.25+
 - Docker (running locally or in CI)
-- `github.com/testcontainers/testcontainers-go v0.42.0`
+- [testcontainers-go](https://github.com/testcontainers/testcontainers-go) (version pinned in `go.mod`)
 
-## Examples
-
-- [`examples/s3`](examples/s3/) — create a bucket, upload documents, list objects
-- [`examples/dynamodb`](examples/dynamodb/) — DynamoDB tables and items
-- [`examples/sqs`](examples/sqs/) — queues, send and receive messages
-- [`examples/sns`](examples/sns/) — topics and subscriptions
-- [`examples/lambda`](examples/lambda/) — deploy and invoke a function
-
-## Running the tests
+## Building and testing
 
 ```bash
-go test -v ./...
+go build ./... && go vet ./...            # compile and vet all packages
+go test ./...                             # all tests
+go test -v -run TestRun_DefaultConfig .   # a single test
 ```
 
-Requires Docker running locally; the `floci/floci:latest` image is pulled automatically on first run.
+Everything except `ports_internal_test.go` starts real Floci containers, so Docker must be running; the
+`floci/floci:latest` image is pulled automatically on first run.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the branching model and how to add a service.
 
-## Related projects
+## Other languages
 
-- [Floci](https://github.com/floci-io/floci) — the emulator itself
-- [testcontainers-floci](https://github.com/floci-io/testcontainers-floci) — Java / Spring Boot module
-- [testcontainers-floci-node](https://github.com/floci-io/testcontainers-floci-node) — Node.js module
-- [testcontainers-floci-python](https://github.com/floci-io/testcontainers-floci-python) — Python module
-- [Testcontainers for Go](https://golang.testcontainers.org)
+| Language | Repository |
+|---|---|
+| Java | [testcontainers-floci](https://github.com/floci-io/testcontainers-floci) |
+| Node.js / TypeScript | [testcontainers-floci-node](https://github.com/floci-io/testcontainers-floci-node) |
+| Python | [testcontainers-floci-python](https://github.com/floci-io/testcontainers-floci-python) |
+| Go | **testcontainers-floci-go** (this repo) |
+| .NET | [testcontainers-floci-dotnet](https://github.com/floci-io/testcontainers-floci-dotnet) |
+
+## Community
+
+- 💬 [Slack](https://join.slack.com/t/floci/shared_invite/zt-3tjn02s3q-A00kEjJ1cZxsg_imTfy6Cw): quick questions and community chat
+- 🗣️ [GitHub Discussions](https://github.com/orgs/floci-io/discussions): ideas, design tradeoffs, and proposals
+- [CONTRIBUTING.md](CONTRIBUTING.md) · [SECURITY.md](SECURITY.md) · [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) · [MAINTAINERS.md](MAINTAINERS.md)
 
 ## License
 
-MIT
+MIT. See [LICENSE](LICENSE).
+
+---
+
+<div align="center">
+
+Floci™ is a trademark of Hector Ventura. Code is MIT-licensed; see
+[TRADEMARK.md](https://github.com/floci-io/.github/blob/main/TRADEMARK.md) for name and logo use.
+
+</div>
