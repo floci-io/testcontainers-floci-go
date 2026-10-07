@@ -5,8 +5,10 @@ name: Semantic Release
 # updates CHANGELOG.md, commits it, and pushes the new tag. That tag's GitHub release
 # triggers publish.yml, which checks the version resolves on the Go module proxy.
 #
-# Releases stay in v0.x: v0.1.0 was seeded by hand, and semantic-release bumps from the
-# latest v-tag. A breaking change (feat! / BREAKING CHANGE) would move to v1.0.0.
+# The module is on v1. semantic-release bumps from the latest v-tag, so a breaking change
+# (feat! / BREAKING CHANGE) would cut v2.0.0, and Go requires a v2 release to change the
+# module path to github.com/floci-io/testcontainers-floci-go/v2 first. Keep changes
+# backward compatible (feat: / fix:) until that move is planned.
 #
 # Required secrets: GH_TOKEN (PAT with contents: write)
 
