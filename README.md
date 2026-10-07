@@ -127,10 +127,6 @@ func TestS3(t *testing.T) {
 > `bytes.NewBufferString` is not seekable and causes the AWS SDK to attempt trailing checksums,
 > which require TLS and fail against a plain HTTP local endpoint.
 
-> **S3 note:** always use `strings.NewReader` or `bytes.NewReader` (seekable) when uploading objects.
-> `bytes.NewBufferString` is not seekable and causes the AWS SDK to attempt trailing checksums,
-> which require TLS and fail against a plain HTTP local endpoint.
-
 ### Sharing a container across tests
 
 Use `TestMain` to start the container once for the whole package:

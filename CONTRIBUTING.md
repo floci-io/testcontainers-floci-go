@@ -36,7 +36,7 @@ This module follows a **tag-driven release model**.
 |---|---|---|
 | `main` | Integration branch — all PRs merge here. Treated as unstable/nightly. | No |
 | `release/x.y.x` | Stable line for a minor version. Receives cherry-picked fixes from `main`. | No |
-| `X.Y.Z` tag | Signals a production release. | Yes (`pkg.go.dev` auto-indexes) |
+| `vX.Y.Z` tag | Signals a production release. | Yes (`pkg.go.dev` auto-indexes) |
 
 ## Developer Certificate of Origin (DCO) sign-off
 
@@ -182,7 +182,7 @@ git checkout main && git pull
 git checkout -b release/1.2.x
 
 # 2. Push — the semver workflow runs semantic-release automatically,
-#    bumps the version, updates CHANGELOG.md, and pushes tag 1.2.0.
+#    bumps the version, updates CHANGELOG.md, and pushes tag v1.2.0.
 git push origin release/1.2.x
 ```
 
