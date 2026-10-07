@@ -19,8 +19,8 @@ go test -v -timeout 300s ./examples/sns/...
 
 ```go
 // Start Floci
-fc, err := floci.NewFlociContainer().Start(ctx)
-t.Cleanup(func() { _ = fc.Stop(ctx) })
+fc, err := floci.Run(ctx, "floci/floci:latest")
+testcontainers.CleanupContainer(t, fc)
 
 // Wire up SNS and SQS clients from the same config
 cfg, err := config.LoadDefaultConfig(ctx,

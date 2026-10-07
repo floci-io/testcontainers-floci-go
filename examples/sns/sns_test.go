@@ -13,16 +13,17 @@ import (
 	sqstypes "github.com/aws/aws-sdk-go-v2/service/sqs/types"
 
 	floci "github.com/floci-io/testcontainers-floci-go"
+	"github.com/testcontainers/testcontainers-go"
 )
 
 func TestSNSExample(t *testing.T) {
 	ctx := context.Background()
 
-	fc, err := floci.NewFlociContainer().Start(ctx)
+	fc, err := floci.Run(ctx, "floci/floci:latest")
+	testcontainers.CleanupContainer(t, fc)
 	if err != nil {
 		t.Fatalf("starting floci: %v", err)
 	}
-	t.Cleanup(func() { _ = fc.Stop(ctx) })
 
 	cfg, err := config.LoadDefaultConfig(ctx,
 		config.WithRegion(fc.GetRegion()),

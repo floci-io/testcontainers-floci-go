@@ -1,5 +1,7 @@
 package floci
 
+import "strings"
+
 import "strconv"
 
 func boolStr(b bool) string {
@@ -692,4 +694,41 @@ func DefaultStepFunctionsConfig() StepFunctionsConfig { return StepFunctionsConf
 
 func (c StepFunctionsConfig) applyEnvVars(t *FlociContainer) {
 	t.withEnv("FLOCI_SERVICES_STEPFUNCTIONS_ENABLED", boolStr(c.Enabled))
+}
+
+// Services that spawn sibling containers need the host Docker socket. The rules mirror
+// requiresDockerSocket() in the Java reference module (testcontainers-floci) and are read
+// from the container environment, not the typed configs, so a generic
+// testcontainers.WithEnv override of FLOCI_SERVICES_<SVC>_ENABLED or _MOCK is honoured.
+var dockerSocketServices = []struct {
+	token    string // FLOCI_SERVICES_<token>_...
+	mockable bool   // in mock mode the service spawns no containers
+}{
+	{"ATHENA", true},
+	{"CODEBUILD", false},
+	{"EC2", true},
+	{"ECR", false},
+	{"ECS", true},
+	{"EKS", true},
+	{"ELASTICACHE", false},
+	{"LAMBDA", false},
+	{"MSK", true},
+	{"OPENSEARCH", true},
+	{"RDS", false},
+}
+
+// dockerSocketRequired reports whether any enabled, non-mocked service in env spawns
+// sibling containers. A missing _ENABLED key means enabled (Floci's default).
+func dockerSocketRequired(env map[string]string) bool {
+	for _, svc := range dockerSocketServices {
+		enabled, ok := env["FLOCI_SERVICES_"+svc.token+"_ENABLED"]
+		if ok && !strings.EqualFold(enabled, "true") {
+			continue
+		}
+		if svc.mockable && strings.EqualFold(env["FLOCI_SERVICES_"+svc.token+"_MOCK"], "true") {
+			continue
+		}
+		return true
+	}
+	return false
 }
