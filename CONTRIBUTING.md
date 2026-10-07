@@ -136,11 +136,20 @@ wip: still working on this       # "wip" is not a recognised type
 
 ## Adding a New Service Configuration
 
-1. Add a `<Service>Config` struct and a `Default<Service>Config()` constructor in `services.go`
-2. Add the corresponding field to `FlociOptions` in `floci.go`
-3. Wire the config into the container environment variables in the `applyOptions` function
-4. Add an example under `examples/<service>/`
-5. Add integration tests in `floci_test.go`
+Port from the Java reference module (`testcontainers-floci`): read its `<Service>Config.java` and
+`<Service>ConfigTest` and match the env-var keys and defaults exactly.
+
+1. In `services.go`, add a `<Service>Config` struct, a `Default<Service>Config()` constructor and its
+   `applyEnvVars` method (and `applyExposedPorts` if the service publishes ports).
+2. In `floci.go`, add the field to `FlociContainer`, set its default in `newBuilder()`, add the
+   `With<Service>Config` builder method, and call it from `applyAllConfigs` (and `refreshExposedPorts`).
+3. In `options.go`, add the package-level `With<Service>Config` option that wraps the builder method, so
+   it can be passed to `Run`.
+4. If the service spawns sibling containers, add it to `dockerSocketServices` in `services.go` (mark it
+   `mockable` if the Java config's `requiresDockerSocket()` checks `!mock`), with a case in
+   `socket_internal_test.go`.
+5. Add an example under `examples/<service>/` and integration coverage in `floci_test.go`, using
+   `floci.Run` and `testcontainers.CleanupContainer`.
 
 ## Pull Request Guidelines
 

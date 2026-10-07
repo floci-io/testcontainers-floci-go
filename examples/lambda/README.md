@@ -20,10 +20,8 @@ go test -v -timeout 300s ./examples/lambda/...
 
 ```go
 // Start Floci with dedicated network — required for Lambda container execution
-fc, err := floci.NewFlociContainer().
-    WithDedicatedNetwork().
-    Start(ctx)
-defer fc.Stop(ctx)
+fc, err := floci.Run(ctx, "floci/floci:latest", floci.WithDedicatedNetwork())
+testcontainers.CleanupContainer(t, fc)
 
 // Build the handler for the Lambda runtime
 cmd := exec.CommandContext(ctx, "go", "build", "-o", binaryPath, "./handler")

@@ -2,9 +2,9 @@
 //
 // Example:
 //
-//	fc, err := floci.Run(ctx)
+//	fc, err := floci.Run(ctx, "floci/floci:latest")
+//	testcontainers.CleanupContainer(t, fc)
 //	if err != nil { ... }
-//	defer fc.Stop(ctx)
 //
 //	cfg, _ := config.LoadDefaultConfig(ctx,
 //	    config.WithRegion(fc.GetRegion()),
@@ -17,6 +17,7 @@ package floci
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"maps"
 	"net/http"
@@ -48,6 +49,8 @@ type FlociContainer struct {
 	envVars          map[string]string
 	ports            map[int]struct{}
 	dedicatedNetwork bool
+	// dockerSocket overrides socket auto-detection when non-nil (see WithDockerSocket).
+	dockerSocketOverride *bool
 
 	acmConfig                   AcmConfig
 	apiGatewayConfig            ApiGatewayConfig
@@ -93,7 +96,14 @@ type FlociContainer struct {
 }
 
 // NewFlociContainer creates a new FlociContainer builder with default configuration.
+//
+// Deprecated: use Run, which follows the testcontainers-go module convention:
+// floci.Run(ctx, "floci/floci:latest", floci.WithRegion("eu-west-1")).
 func NewFlociContainer() *FlociContainer {
+	return newBuilder()
+}
+
+func newBuilder() *FlociContainer {
 	c := &FlociContainer{
 		image:   defaultImage,
 		envVars: make(map[string]string),
@@ -149,24 +159,45 @@ func NewFlociContainer() *FlociContainer {
 	return c
 }
 
-// Option is a functional option for configuring a FlociContainer.
+// Option configures Floci-specific settings. It implements
+// testcontainers.ContainerCustomizer, so Floci options and generic testcontainers
+// options can be passed to Run together:
+//
+//	floci.Run(ctx, "floci/floci:latest",
+//	    floci.WithRegion("eu-west-1"),
+//	    testcontainers.WithEnv(map[string]string{"FLOCI_LOG_LEVEL": "debug"}),
+//	)
 type Option func(*FlociContainer)
 
-// Run creates and starts a Floci container, applying the provided options.
-// It is the recommended entry point for starting Floci in tests.
+// Customize is a no-op: Floci options are applied to the module's own settings
+// before the container request is built.
+func (o Option) Customize(*testcontainers.GenericContainerRequest) error { return nil }
+
+// Run creates and starts a Floci container from the given image, following the
+// testcontainers-go module convention. Floci options (WithRegion, WithS3Config, ...)
+// configure the emulator; any other testcontainers.ContainerCustomizer is applied to
+// the container request after the module's defaults, so it can override them.
 //
-//	fc, err := floci.Run(ctx)
+// The returned container is non-nil whenever the container was created, even if
+// Run also returns an error, so it can always be cleaned up:
 //
-//	fc, err := floci.Run(ctx, func(c *floci.FlociContainer) {
-//	    c.WithRegion("eu-west-1")
-//	    c.WithS3Config(floci.S3Config{Enabled: true})
-//	})
-func Run(ctx context.Context, opts ...Option) (*StartedFlociContainer, error) {
-	c := NewFlociContainer()
-	for _, opt := range opts {
-		opt(c)
+//	fc, err := floci.Run(ctx, "floci/floci:latest")
+//	testcontainers.CleanupContainer(t, fc)
+//	require.NoError(t, err)
+func Run(ctx context.Context, img string, opts ...testcontainers.ContainerCustomizer) (*Container, error) {
+	c := newBuilder()
+	if img != "" {
+		c.image = img
 	}
-	return c.Start(ctx)
+	var customizers []testcontainers.ContainerCustomizer
+	for _, opt := range opts {
+		if o, ok := opt.(Option); ok {
+			o(c)
+			continue
+		}
+		customizers = append(customizers, opt)
+	}
+	return c.run(ctx, customizers...)
 }
 
 func (c *FlociContainer) withEnv(key, value string) *FlociContainer {
@@ -205,6 +236,15 @@ func (c *FlociContainer) WithAvailabilityZone(zone string) *FlociContainer {
 // generated at Start() time and automatically passed via FLOCI_SERVICES_DOCKER_NETWORK.
 func (c *FlociContainer) WithDedicatedNetwork() *FlociContainer {
 	c.dedicatedNetwork = true
+	return c
+}
+
+// WithDockerSocket overrides whether the host Docker socket is mounted. By default it
+// is mounted only while an enabled service spawns sibling containers (Lambda, RDS,
+// ElastiCache, ECS, EC2, EKS, ECR, MSK, OpenSearch, Athena, CodeBuild); pass false on
+// hosts where the socket cannot be mounted, true to always mount it.
+func (c *FlociContainer) WithDockerSocket(enabled bool) *FlociContainer {
+	c.dockerSocketOverride = &enabled
 	return c
 }
 
@@ -502,7 +542,23 @@ func (c *FlociContainer) WithStepFunctionsConfig(cfg StepFunctionsConfig) *Floci
 }
 
 // Start launches the Floci container and waits for it to be ready.
+//
+// Deprecated: use Run.
 func (c *FlociContainer) Start(ctx context.Context) (*StartedFlociContainer, error) {
+	return c.run(ctx)
+}
+
+// needsDockerSocket reports whether the host Docker socket should be mounted for the
+// given final container environment: an explicit WithDockerSocket override wins,
+// otherwise any enabled service that spawns sibling containers requires it.
+func (c *FlociContainer) needsDockerSocket(env map[string]string) bool {
+	if c.dockerSocketOverride != nil {
+		return *c.dockerSocketOverride
+	}
+	return dockerSocketRequired(env)
+}
+
+func (c *FlociContainer) run(ctx context.Context, customizers ...testcontainers.ContainerCustomizer) (*Container, error) {
 	var dockerNetwork *testcontainers.DockerNetwork
 	if c.dedicatedNetwork {
 		var err error
@@ -513,86 +569,89 @@ func (c *FlociContainer) Start(ctx context.Context) (*StartedFlociContainer, err
 		c.withEnv("FLOCI_SERVICES_DOCKER_NETWORK", dockerNetwork.Name)
 	}
 
+	opts, finalEnv := c.requestOptions(dockerNetwork, customizers)
+	ctr, err := testcontainers.Run(ctx, c.image, opts...)
+
+	var fc *Container
+	if ctr != nil {
+		fc = &Container{
+			Container:            ctr,
+			network:              dockerNetwork,
+			region:               envOr(*finalEnv, "FLOCI_DEFAULT_REGION", DefaultRegion),
+			availabilityZone:     envOr(*finalEnv, "FLOCI_DEFAULT_AVAILABILITY_ZONE", DefaultAvailabilityZone),
+			accountID:            envOr(*finalEnv, "FLOCI_DEFAULT_ACCOUNT_ID", DefaultAccountID),
+			dedicatedNetworkName: networkName(dockerNetwork),
+		}
+	} else if dockerNetwork != nil {
+		// No container owns the network yet, so nothing else would remove it.
+		_ = dockerNetwork.Remove(ctx)
+	}
+	if err != nil {
+		return fc, fmt.Errorf("run floci: %w", err)
+	}
+
+	endpoint, err := ctr.PortEndpoint(ctx, fmt.Sprintf("%d/tcp", flociPort), "http")
+	if err != nil {
+		return fc, fmt.Errorf("getting floci endpoint: %w", err)
+	}
+	fc.endpoint = endpoint
+	return fc, nil
+}
+
+// requestOptions returns the customizers for testcontainers.Run: the module defaults,
+// then the caller's customizers, then a final step that sees the fully customized
+// request. That last step records the final environment (for the identity getters) and
+// decides the Docker socket mount from it, so generic options such as
+// testcontainers.WithEnv cannot leave either out of sync with what the emulator runs.
+func (c *FlociContainer) requestOptions(dockerNetwork *testcontainers.DockerNetwork, customizers []testcontainers.ContainerCustomizer) ([]testcontainers.ContainerCustomizer, *map[string]string) {
 	exposedPorts := make([]string, 0, len(c.ports))
 	for port := range c.ports {
 		exposedPorts = append(exposedPorts, fmt.Sprintf("%d/tcp", port))
 	}
 
-	envCopy := maps.Clone(c.envVars)
-
-	req := testcontainers.ContainerRequest{
-		Image:        c.image,
-		ExposedPorts: exposedPorts,
-		Env:          envCopy,
-		HostConfigModifier: func(hc *dockercontainer.HostConfig) {
-			hc.Binds = append(hc.Binds, dockerSocket+":"+dockerSocket)
-		},
-		WaitingFor: wait.ForHTTP("/_floci/health").
+	opts := []testcontainers.ContainerCustomizer{
+		testcontainers.WithExposedPorts(exposedPorts...),
+		testcontainers.WithEnv(maps.Clone(c.envVars)),
+		testcontainers.WithWaitStrategy(wait.ForHTTP("/_floci/health").
 			WithPort(fmt.Sprintf("%d/tcp", flociPort)).
 			WithStatusCodeMatcher(func(status int) bool { return status == http.StatusOK }).
-			WithStartupTimeout(startupTimeout),
+			WithStartupTimeout(startupTimeout)),
 	}
-
 	if dockerNetwork != nil {
-		req.Networks = []string{dockerNetwork.Name}
+		opts = append(opts, tcnetwork.WithNetwork(nil, dockerNetwork))
 	}
+	opts = append(opts, customizers...)
 
-	container, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
-		ContainerRequest: req,
-		Started:          true,
-	})
-	if err != nil {
-		if dockerNetwork != nil {
-			_ = dockerNetwork.Remove(ctx)
+	finalEnv := map[string]string{}
+	opts = append(opts, testcontainers.CustomizeRequestOption(func(req *testcontainers.GenericContainerRequest) error {
+		finalEnv = maps.Clone(req.Env)
+		if c.needsDockerSocket(req.Env) {
+			// Chain rather than replace, so a caller's WithHostConfigModifier still runs.
+			prev := req.HostConfigModifier
+			req.HostConfigModifier = func(hc *dockercontainer.HostConfig) {
+				if prev != nil {
+					prev(hc)
+				}
+				hc.Binds = append(hc.Binds, dockerSocket+":"+dockerSocket)
+			}
 		}
-		return nil, fmt.Errorf("starting floci container: %w", err)
-	}
+		return nil
+	}))
+	return opts, &finalEnv
+}
 
-	host, err := container.Host(ctx)
-	if err != nil {
-		_ = container.Terminate(ctx)
-		if dockerNetwork != nil {
-			_ = dockerNetwork.Remove(ctx)
-		}
-		return nil, fmt.Errorf("getting container host: %w", err)
+func envOr(env map[string]string, key, fallback string) string {
+	if v := env[key]; v != "" {
+		return v
 	}
+	return fallback
+}
 
-	mappedPort, err := container.MappedPort(ctx, strconv.Itoa(flociPort))
-	if err != nil {
-		_ = container.Terminate(ctx)
-		if dockerNetwork != nil {
-			_ = dockerNetwork.Remove(ctx)
-		}
-		return nil, fmt.Errorf("getting mapped port: %w", err)
+func networkName(nw *testcontainers.DockerNetwork) string {
+	if nw == nil {
+		return ""
 	}
-
-	region := c.envVars["FLOCI_DEFAULT_REGION"]
-	if region == "" {
-		region = DefaultRegion
-	}
-	az := c.envVars["FLOCI_DEFAULT_AVAILABILITY_ZONE"]
-	if az == "" {
-		az = DefaultAvailabilityZone
-	}
-	accountID := c.envVars["FLOCI_DEFAULT_ACCOUNT_ID"]
-	if accountID == "" {
-		accountID = DefaultAccountID
-	}
-
-	dedicatedNetworkName := ""
-	if dockerNetwork != nil {
-		dedicatedNetworkName = dockerNetwork.Name
-	}
-
-	return &StartedFlociContainer{
-		container:            container,
-		network:              dockerNetwork,
-		endpoint:             fmt.Sprintf("http://%s:%s", host, mappedPort.Port()),
-		region:               region,
-		availabilityZone:     az,
-		accountID:            accountID,
-		dedicatedNetworkName: dedicatedNetworkName,
-	}, nil
+	return nw.Name
 }
 
 func (c *FlociContainer) applyAllConfigs() {
@@ -652,9 +711,10 @@ func (c *FlociContainer) refreshExposedPorts() {
 	c.rdsConfig.applyExposedPorts(c)
 }
 
-// StartedFlociContainer is a running Floci container instance.
-type StartedFlociContainer struct {
-	container            testcontainers.Container
+// Container is a running Floci container. It embeds testcontainers.Container, so
+// Logs, Exec, Host, MappedPort and testcontainers.CleanupContainer all work on it.
+type Container struct {
+	testcontainers.Container
 	network              *testcontainers.DockerNetwork
 	endpoint             string
 	region               string
@@ -663,30 +723,38 @@ type StartedFlociContainer struct {
 	dedicatedNetworkName string
 }
 
+// Container must stay a drop-in testcontainers.Container (CleanupContainer, Logs, Exec).
+var _ testcontainers.Container = (*Container)(nil)
+
+// StartedFlociContainer is the type returned by the deprecated Start.
+//
+// Deprecated: use Container.
+type StartedFlociContainer = Container
+
 // GetEndpoint returns the HTTP endpoint for Floci (e.g. "http://localhost:32768").
-func (s *StartedFlociContainer) GetEndpoint() string { return s.endpoint }
+func (s *Container) GetEndpoint() string { return s.endpoint }
 
 // GetRegion returns the configured AWS region.
-func (s *StartedFlociContainer) GetRegion() string { return s.region }
+func (s *Container) GetRegion() string { return s.region }
 
 // GetAccessKey returns the AWS access key (always "test").
-func (s *StartedFlociContainer) GetAccessKey() string { return DefaultAccessKey }
+func (s *Container) GetAccessKey() string { return DefaultAccessKey }
 
 // GetSecretKey returns the AWS secret key (always "test").
-func (s *StartedFlociContainer) GetSecretKey() string { return DefaultSecretKey }
+func (s *Container) GetSecretKey() string { return DefaultSecretKey }
 
 // GetAccountID returns the configured AWS account ID.
-func (s *StartedFlociContainer) GetAccountID() string { return s.accountID }
+func (s *Container) GetAccountID() string { return s.accountID }
 
 // GetAvailabilityZone returns the configured availability zone.
-func (s *StartedFlociContainer) GetAvailabilityZone() string { return s.availabilityZone }
+func (s *Container) GetAvailabilityZone() string { return s.availabilityZone }
 
 // GetDedicatedNetworkName returns the dedicated Docker network name, or empty string if none.
-func (s *StartedFlociContainer) GetDedicatedNetworkName() string { return s.dedicatedNetworkName }
+func (s *Container) GetDedicatedNetworkName() string { return s.dedicatedNetworkName }
 
 // GetMappedPort returns the host-mapped port for a given container port.
-func (s *StartedFlociContainer) GetMappedPort(ctx context.Context, port int) (int, error) {
-	mapped, err := s.container.MappedPort(ctx, strconv.Itoa(port))
+func (s *Container) GetMappedPort(ctx context.Context, port int) (int, error) {
+	mapped, err := s.MappedPort(ctx, fmt.Sprintf("%d/tcp", port))
 	if err != nil {
 		return 0, err
 	}
@@ -697,15 +765,14 @@ func (s *StartedFlociContainer) GetMappedPort(ctx context.Context, port int) (in
 	return p, nil
 }
 
-// Stop terminates the Floci container and removes any dedicated network.
-func (s *StartedFlociContainer) Stop(ctx context.Context) error {
-	if err := s.container.Terminate(ctx); err != nil {
-		return fmt.Errorf("terminating floci container: %w", err)
-	}
+// Terminate stops and removes the container, then removes the dedicated network
+// created by WithDedicatedNetwork, if any.
+func (s *Container) Terminate(ctx context.Context, opts ...testcontainers.TerminateOption) error {
+	err := s.Container.Terminate(ctx, opts...)
 	if s.network != nil {
-		if err := s.network.Remove(ctx); err != nil {
-			return fmt.Errorf("removing network: %w", err)
+		if nerr := s.network.Remove(ctx); nerr != nil {
+			err = errors.Join(err, fmt.Errorf("removing network: %w", nerr))
 		}
 	}
-	return nil
+	return err
 }

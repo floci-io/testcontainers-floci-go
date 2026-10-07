@@ -70,16 +70,17 @@ import (
     "github.com/aws/aws-sdk-go-v2/service/s3"
 
     floci "github.com/floci-io/testcontainers-floci-go"
+    "github.com/testcontainers/testcontainers-go"
 )
 
 func TestS3(t *testing.T) {
     ctx := context.Background()
 
-    fc, err := floci.NewFlociContainer().Start(ctx)
+    fc, err := floci.Run(ctx, "floci/floci:latest")
+    testcontainers.CleanupContainer(t, fc)
     if err != nil {
         t.Fatal(err)
     }
-    t.Cleanup(func() { _ = fc.Stop(ctx) })
 
     cfg, err := config.LoadDefaultConfig(ctx,
         config.WithRegion(fc.GetRegion()),
@@ -140,19 +141,20 @@ import (
     "testing"
 
     floci "github.com/floci-io/testcontainers-floci-go"
+    "github.com/testcontainers/testcontainers-go"
 )
 
-var fc *floci.StartedFlociContainer
+var fc *floci.Container
 
 func TestMain(m *testing.M) {
     ctx := context.Background()
     var err error
-    fc, err = floci.NewFlociContainer().Start(ctx)
+    fc, err = floci.Run(ctx, "floci/floci:latest")
     if err != nil {
         panic(err)
     }
     code := m.Run()
-    _ = fc.Stop(ctx)
+    _ = testcontainers.TerminateContainer(fc)
     os.Exit(code)
 }
 ```
@@ -176,95 +178,95 @@ corresponding `With*Config` method; unset fields keep their defaults. See the
 #### S3
 
 ```go
-fc, _ := floci.NewFlociContainer().
-    WithS3Config(floci.S3Config{
+fc, err := floci.Run(ctx, "floci/floci:latest",
+    floci.WithS3Config(floci.S3Config{
         Enabled:                     true,
         DefaultPresignExpirySeconds: 7200,
-    }).
-    Start(ctx)
+    }),
+)
 ```
 
 #### SQS
 
 ```go
-fc, _ := floci.NewFlociContainer().
-    WithSqsConfig(floci.SqsConfig{
+fc, err := floci.Run(ctx, "floci/floci:latest",
+    floci.WithSqsConfig(floci.SqsConfig{
         Enabled:                  true,
         DefaultVisibilityTimeout: 60,
         MaxMessageSize:           262144,
-    }).
-    Start(ctx)
+    }),
+)
 ```
 
 #### DynamoDB
 
 ```go
-fc, _ := floci.NewFlociContainer().
-    WithDynamoDbConfig(floci.DynamoDbConfig{Enabled: true}).
-    Start(ctx)
+fc, err := floci.Run(ctx, "floci/floci:latest",
+    floci.WithDynamoDbConfig(floci.DynamoDbConfig{Enabled: true}),
+)
 ```
 
 #### Lambda
 
 ```go
-fc, _ := floci.NewFlociContainer().
-    WithDedicatedNetwork(). // required for Lambda to reach Floci
-    WithLambdaConfig(floci.LambdaConfig{
+fc, err := floci.Run(ctx, "floci/floci:latest",
+    floci.WithDedicatedNetwork(), // required for Lambda to reach Floci
+    floci.WithLambdaConfig(floci.LambdaConfig{
         Enabled:               true,
         DefaultMemoryMb:       256,
         DefaultTimeoutSeconds: 30,
         HotReloadEnabled:      true,
         ExposeRuntimePorts:    true, // invoke Lambdas from the host
-    }).
-    Start(ctx)
+    }),
+)
 ```
 
 #### RDS (PostgreSQL / MySQL / MariaDB)
 
 ```go
-fc, _ := floci.NewFlociContainer().
-    WithDedicatedNetwork().
-    WithRdsConfig(floci.RdsConfig{
+fc, err := floci.Run(ctx, "floci/floci:latest",
+    floci.WithDedicatedNetwork(),
+    floci.WithRdsConfig(floci.RdsConfig{
         Enabled:              true,
         DefaultPostgresImage: "postgres:16-alpine",
-    }).
-    Start(ctx)
+    }),
+)
 ```
 
 #### ElastiCache (Redis / Valkey)
 
 ```go
-fc, _ := floci.NewFlociContainer().
-    WithDedicatedNetwork().
-    WithElastiCacheConfig(floci.ElastiCacheConfig{
+fc, err := floci.Run(ctx, "floci/floci:latest",
+    floci.WithDedicatedNetwork(),
+    floci.WithElastiCacheConfig(floci.ElastiCacheConfig{
         Enabled:      true,
         DefaultImage: "valkey/valkey:8",
-    }).
-    Start(ctx)
+    }),
+)
 ```
 
 #### OpenSearch
 
 ```go
-fc, _ := floci.NewFlociContainer().
-    WithDedicatedNetwork().
-    WithOpenSearchConfig(floci.OpenSearchConfig{
+fc, err := floci.Run(ctx, "floci/floci:latest",
+    floci.WithDedicatedNetwork(),
+    floci.WithOpenSearchConfig(floci.OpenSearchConfig{
         Enabled: true,
         Mock:    false,
-    }).
-    Start(ctx)
+    }),
+)
 ```
 
 #### MSK (Kafka via Redpanda)
 
 ```go
-fc, _ := floci.NewFlociContainer().
-    WithDedicatedNetwork().
-    WithMskConfig(floci.MskConfig{
+fc, err := floci.Run(ctx, "floci/floci:latest",
+    floci.WithDedicatedNetwork(),
+    floci.WithMskConfig(floci.MskConfig{
         Enabled:      true,
         DefaultImage: "redpandadata/redpanda:latest",
-    }).
-    Start(ctx)
+    }),
+)
 ```
 
 ### All available config structs
@@ -316,13 +318,12 @@ fc, _ := floci.NewFlociContainer().
 ## Container options
 
 ```go
-fc, _ := floci.NewFlociContainer().
-    WithImage("floci/floci:latest").   // pin a specific tag
-    WithRegion("eu-west-1").
-    WithAccountID("111122223333").
-    WithAvailabilityZone("eu-west-1a").
-    WithDedicatedNetwork().            // isolated Docker network for stateful services
-    Start(ctx)
+fc, err := floci.Run(ctx, "floci/floci:latest", // image: pin a specific tag here
+    floci.WithRegion("eu-west-1"),
+    floci.WithAccountID("111122223333"),
+    floci.WithAvailabilityZone("eu-west-1a"),
+    floci.WithDedicatedNetwork(),            // isolated Docker network for stateful services
+)
 ```
 
 ### Connection details
@@ -340,28 +341,63 @@ fc, _ := floci.NewFlociContainer().
 
 ### Dedicated network
 
-Services that spawn real Docker containers (Lambda, RDS, ElastiCache, MSK, OpenSearch, ECR, EKS) need a Docker network to communicate with Floci. Call `WithDedicatedNetwork()` to have the module create and manage one automatically:
+Services that spawn real Docker containers (Lambda, RDS, ElastiCache, MSK, OpenSearch, ECR, EKS) need a Docker network to communicate with Floci. Pass `floci.WithDedicatedNetwork()` to have the module create and manage one automatically:
 
 ```go
-fc, _ := floci.NewFlociContainer().
-    WithDedicatedNetwork().
-    WithLambdaConfig(floci.LambdaConfig{Enabled: true}).
-    Start(ctx)
+fc, err := floci.Run(ctx, "floci/floci:latest",
+    floci.WithDedicatedNetwork(),
+    floci.WithLambdaConfig(floci.LambdaConfig{Enabled: true}),
+)
 
 // The network name is passed to Floci automatically via FLOCI_SERVICES_DOCKER_NETWORK.
 // fc.GetDedicatedNetworkName() returns it if you need it elsewhere.
 ```
 
-The network is removed when `Stop` is called.
+The network is removed when the container is terminated (`testcontainers.CleanupContainer` or `Terminate`).
+
+### Docker socket
+
+Services that spawn sibling containers (Lambda, RDS, ElastiCache, ECS, EC2, EKS, ECR, MSK, OpenSearch, Athena,
+CodeBuild) need the host Docker socket. The module mounts it only while at least one of them is enabled and not in
+`Mock` mode; all services are enabled by default, so a default container gets it. Override the detection with
+`floci.WithDockerSocket(false)` on hosts where the socket cannot be mounted (rootless Podman with SELinux, some CI
+sandboxes), or `floci.WithDockerSocket(true)` to always mount it.
+
+### Generic testcontainers options
+
+`Run` accepts any `testcontainers.ContainerCustomizer`, so Floci options and the standard testcontainers-go options
+compose. Generic options are applied after the module defaults and can override them:
+
+```go
+fc, err := floci.Run(ctx, "floci/floci:latest",
+    floci.WithRegion("eu-west-1"),
+    testcontainers.WithEnv(map[string]string{"FLOCI_LOG_LEVEL": "debug"}),
+)
+```
+
+`*floci.Container` embeds `testcontainers.Container`, so `Logs`, `Exec`, `Inspect` and the cleanup helpers work on it.
+
+### Migrating from the builder API
+
+`NewFlociContainer()...Start(ctx)` still works but is deprecated. Each builder method has a package-level option of
+the same name:
+
+| Before | After |
+|---|---|
+| `floci.NewFlociContainer().WithRegion("eu-west-1").Start(ctx)` | `floci.Run(ctx, "floci/floci:latest", floci.WithRegion("eu-west-1"))` |
+| `floci.Run(ctx, func(c *floci.FlociContainer) { c.WithS3Config(cfg) })` | `floci.Run(ctx, "floci/floci:latest", floci.WithS3Config(cfg))` |
+| `.WithImage("floci/floci:x.y.z")` | the `img` argument of `Run` |
+| `*floci.StartedFlociContainer` | `*floci.Container` (the old name is a deprecated alias) |
+| `fc.Stop(ctx)` | `testcontainers.CleanupContainer(t, fc)` in tests, or `fc.Terminate(ctx)` |
 
 ## Docker image tags
 
 By default the module runs the floating `latest` tag of the emulator image (`floci/floci:latest`), so you always test
-against the current emulator. Use `WithImage` to pin a release or follow `main`:
+against the current emulator. Pass a different image to `Run` to pin a release or follow `main`:
 
 ```go
-floci.NewFlociContainer().WithImage("floci/floci:x.y.z")   // a specific release
-floci.NewFlociContainer().WithImage("floci/floci:nightly") // built from main every night
+floci.Run(ctx, "floci/floci:x.y.z")   // a specific release
+floci.Run(ctx, "floci/floci:nightly") // built from main every night
 ```
 
 Every emulator publishes `latest`, `x.y.z` and `nightly` tags. The AWS emulator also publishes a compat variant:

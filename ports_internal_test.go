@@ -74,7 +74,7 @@ func TestExposedPorts_FlagsExposeServiceRanges(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			c := NewFlociContainer()
+			c := newBuilder()
 			tt.apply(c)
 
 			if got, want := len(c.ports), 1+tt.count; got != want {
@@ -95,7 +95,7 @@ func TestExposedPorts_FlagsExposeServiceRanges(t *testing.T) {
 // Exposure flags must be declarative: re-applying a config with the flag
 // turned off has to remove the ports a previous application added.
 func TestExposedPorts_OptOutRemovesPreviouslyAddedPorts(t *testing.T) {
-	c := NewFlociContainer()
+	c := newBuilder()
 
 	if got := len(c.ports); got != 1 {
 		t.Fatalf("expected only the edge port exposed by default, got %d ports", got)

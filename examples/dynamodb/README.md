@@ -18,8 +18,8 @@ go test -v -timeout 300s ./examples/dynamodb/...
 
 ```go
 // Start Floci
-fc, err := floci.NewFlociContainer().Start(ctx)
-defer fc.Stop(ctx)
+fc, err := floci.Run(ctx, "floci/floci:latest")
+testcontainers.CleanupContainer(t, fc)
 
 // Wire up the AWS SDK DynamoDB client
 cfg, _ := config.LoadDefaultConfig(ctx,

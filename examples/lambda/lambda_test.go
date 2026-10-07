@@ -18,18 +18,17 @@ import (
 	ltypes "github.com/aws/aws-sdk-go-v2/service/lambda/types"
 
 	floci "github.com/floci-io/testcontainers-floci-go"
+	"github.com/testcontainers/testcontainers-go"
 )
 
 func TestLambdaExample(t *testing.T) {
 	ctx := context.Background()
 
-	fc, err := floci.NewFlociContainer().
-		WithDedicatedNetwork().
-		Start(ctx)
+	fc, err := floci.Run(ctx, "floci/floci:latest", floci.WithDedicatedNetwork())
+	testcontainers.CleanupContainer(t, fc)
 	if err != nil {
 		t.Fatalf("starting floci: %v", err)
 	}
-	t.Cleanup(func() { _ = fc.Stop(ctx) })
 
 	tmpDir := t.TempDir()
 	binaryPath := filepath.Join(tmpDir, "bootstrap")
