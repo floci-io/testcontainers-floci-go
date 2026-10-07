@@ -30,13 +30,12 @@ go test -run TestRun_DefaultConfig .   # run a single test
 
 ## Branching Model
 
-This module follows a **tag-driven release model**.
+Releases are cut from `main` by semantic-release; there are no release branches.
 
-| Branch | Purpose | Published? |
+| Branch / tag | Purpose | Published? |
 |---|---|---|
-| `main` | Integration branch — all PRs merge here. Treated as unstable/nightly. | No |
-| `release/x.y.x` | Stable line for a minor version. Receives cherry-picked fixes from `main`. | No |
-| `vX.Y.Z` tag | Signals a production release. | Yes (`pkg.go.dev` auto-indexes) |
+| `main` | Integration branch: all PRs merge here. Every merge that changes the module is analysed for a release. | Only when a commit warrants one |
+| `vX.Y.Z` tag | A release, created by semantic-release. | Yes (Go module proxy, `pkg.go.dev` auto-indexes) |
 
 ## Developer Certificate of Origin (DCO) sign-off
 
@@ -183,30 +182,17 @@ CI runs automatically on every pull request, and all checks must pass before mer
 
 ## Release Process (maintainers)
 
-### New minor or major release
+Releases are automatic. When a PR merges to `main` and touches `*.go`, `go.mod`, `.releaserc.json` or
+`.github/workflows/semver.yml`, the `Semantic Release` workflow runs semantic-release:
 
-```bash
-# 1. Create a release branch from main
-git checkout main && git pull
-git checkout -b release/1.2.x
+- `fix:` and `perf:` commits since the last `vX.Y.Z` tag produce a patch release, `feat:` a minor
+  release; `docs:`, `chore:`, `ci:`, `test:` and `refactor:` produce none.
+- It updates `CHANGELOG.md`, commits it to `main`, pushes the `vX.Y.Z` tag and creates the GitHub
+  release, which runs `publish.yml` to confirm the version on the Go module proxy.
+- The module is in v0.x. A breaking change (`feat!:` or a `BREAKING CHANGE:` footer) moves it to
+  v1.0.0, so land breaking changes deliberately.
 
-# 2. Push — the semver workflow runs semantic-release automatically,
-#    bumps the version, updates CHANGELOG.md, and pushes tag v1.2.0.
-git push origin release/1.2.x
-```
-
-### Patch release on an existing line
-
-```bash
-git checkout release/1.1.x
-git cherry-pick <commit-sha>
-git push origin release/1.1.x
-```
-
-### Hotfix
-
-1. Fix on `main` via the normal PR process.
-2. Cherry-pick the merge commit onto the relevant `release/x.y.x` branch and push.
+To release a fix, merge it to `main` with a `fix:` commit; there is nothing to cherry-pick.
 
 ## Reporting Security Issues
 
