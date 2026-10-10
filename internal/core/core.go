@@ -229,13 +229,18 @@ func (c *Container) Reset(ctx context.Context) error {
 	return nil
 }
 
-// Terminate stops and removes the container, then removes the dedicated network, if any.
+// Terminate stops and removes the container, then cleans up after it (see Cleanup).
 func (c *Container) Terminate(ctx context.Context, opts ...testcontainers.TerminateOption) error {
-	err := c.Container.Terminate(ctx, opts...)
+	return errors.Join(c.Container.Terminate(ctx, opts...), c.Cleanup(ctx))
+}
+
+// Cleanup removes what outlives the emulator container: the dedicated network, if any. Call it
+// after the emulator container is gone; Terminate does both.
+func (c *Container) Cleanup(ctx context.Context) error {
 	if c.network != nil {
-		if nerr := c.network.Remove(ctx); nerr != nil {
-			err = errors.Join(err, fmt.Errorf("removing network: %w", nerr))
+		if err := c.network.Remove(ctx); err != nil {
+			return fmt.Errorf("removing network: %w", err)
 		}
 	}
-	return err
+	return nil
 }

@@ -732,16 +732,14 @@ func (s *Container) GetResourceNamespace() string {
 	return s.core.GetResourceNamespace()
 }
 
-// GetMappedPort returns the host-mapped port for a given container port.
+// GetMappedPort returns the host-mapped port for a given container port, asking the embedded
+// Container (so a wrapper assigned to it is honoured).
 func (s *Container) GetMappedPort(ctx context.Context, port int) (int, error) {
-	if s.core == nil {
-		mapped, err := s.MappedPort(ctx, fmt.Sprintf("%d/tcp", port))
-		if err != nil {
-			return 0, err
-		}
-		return strconv.Atoi(mapped.Port())
+	mapped, err := s.MappedPort(ctx, fmt.Sprintf("%d/tcp", port))
+	if err != nil {
+		return 0, err
 	}
-	return s.core.GetMappedPort(ctx, port)
+	return strconv.Atoi(mapped.Port())
 }
 
 // Reset wipes all emulator state (buckets, queues, tables, ...) without restarting.
@@ -752,13 +750,15 @@ func (s *Container) Reset(ctx context.Context) error {
 	return s.core.Reset(ctx)
 }
 
-// Terminate stops and removes the container, then Floci's sibling containers and the dedicated
+// Terminate stops and removes the container through the embedded Container (so a wrapper
+// assigned to it runs its own cleanup), then removes Floci's sibling containers and the dedicated
 // network, if any.
 func (s *Container) Terminate(ctx context.Context, opts ...testcontainers.TerminateOption) error {
-	if s.core == nil {
-		return s.Container.Terminate(ctx, opts...)
+	err := s.Container.Terminate(ctx, opts...)
+	if s.core != nil {
+		err = errors.Join(err, s.core.Cleanup(ctx))
 	}
-	return s.core.Terminate(ctx, opts...)
+	return err
 }
 
 // GetRegion returns the configured AWS region.

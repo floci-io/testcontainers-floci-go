@@ -191,3 +191,38 @@ func TestRun_Reset(t *testing.T) {
 		t.Fatalf("create queue after reset: %v", err)
 	}
 }
+
+// terminateRecorder wraps a container and records that its own Terminate ran.
+type terminateRecorder struct {
+	testcontainers.Container
+	called bool
+}
+
+func (w *terminateRecorder) Terminate(ctx context.Context, opts ...testcontainers.TerminateOption) error {
+	w.called = true
+	return w.Container.Terminate(ctx, opts...)
+}
+
+// A wrapper assigned to the embedded Container after Run is the one Terminate goes through, so
+// its own cleanup runs.
+func TestRun_TerminateGoesThroughAssignedWrapper(t *testing.T) {
+	ctx := context.Background()
+
+	container, err := floci.Run(ctx, testImage)
+	testcontainers.CleanupContainer(t, container)
+	if err != nil {
+		t.Fatalf("starting container: %v", err)
+	}
+	wrapper := &terminateRecorder{Container: container.Container}
+	container.Container = wrapper
+
+	if _, err := container.GetMappedPort(ctx, 4566); err != nil {
+		t.Fatalf("mapped port through the wrapper: %v", err)
+	}
+	if err := container.Terminate(ctx); err != nil {
+		t.Fatalf("terminate: %v", err)
+	}
+	if !wrapper.called {
+		t.Fatal("Terminate skipped the assigned wrapper")
+	}
+}
