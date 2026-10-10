@@ -1,4 +1,13 @@
-# 1.0.0 (2026-10-07)
+# Changelog
+
+## [1.1.0](https://github.com/floci-io/testcontainers-floci-go/compare/v1.0.0...v1.1.0) (2026-10-10)
+
+
+### Features
+
+* shared core with a cloud descriptor; AWS module moves to flociaws ([#17](https://github.com/floci-io/testcontainers-floci-go/issues/17)) ([fbfa4ee](https://github.com/floci-io/testcontainers-floci-go/commit/fbfa4eecab0787b195e2c3cef7779e0d45020d8e))
+
+## 1.0.0 (2026-10-07)
 
 
 * feat!: Run follows the testcontainers-go module convention ([#12](https://github.com/floci-io/testcontainers-floci-go/issues/12)) ([a89718a](https://github.com/floci-io/testcontainers-floci-go/commit/a89718a84db3ce25e55442296c3b31334a23c584)), closes [#3](https://github.com/floci-io/testcontainers-floci-go/issues/3)
