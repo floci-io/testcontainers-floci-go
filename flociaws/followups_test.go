@@ -52,8 +52,8 @@ func TestRun_TerminateRemovesSiblings(t *testing.T) {
 	ctx := context.Background()
 
 	container, err := floci.Run(ctx, testImage)
+	testcontainers.CleanupContainer(t, container)
 	if err != nil {
-		testcontainers.CleanupContainer(t, container)
 		t.Fatalf("starting container: %v", err)
 	}
 	ns := container.GetResourceNamespace()
@@ -62,11 +62,9 @@ func TestRun_TerminateRemovesSiblings(t *testing.T) {
 		RepositoryName: aws.String("cleanup-test"),
 	})
 	if err != nil {
-		testcontainers.CleanupContainer(t, container)
 		t.Fatalf("create repository: %v", err)
 	}
 	if siblings(t, ns) == 0 {
-		testcontainers.CleanupContainer(t, container)
 		t.Fatal("expected the ECR registry as a sibling container")
 	}
 

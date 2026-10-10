@@ -178,7 +178,8 @@ func (r Request) setHostSettings(req *testcontainers.GenericContainerRequest) er
 		if host == "" {
 			h, err := dockerHost()
 			if err != nil {
-				return fmt.Errorf("resolving the Docker host for %s: %w", key, err)
+				// No Docker to ask: the start fails on its own, so leave Floci's default.
+				return nil
 			}
 			host = h
 		}

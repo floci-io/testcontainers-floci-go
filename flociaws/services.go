@@ -559,6 +559,9 @@ func (c RdsConfig) applyEnvVars(t *FlociContainer) {
 	t.withEnv("FLOCI_SERVICES_RDS_DEFAULT_MARIADB_IMAGE", c.DefaultMariadbImage)
 	if c.EndpointHost != "" {
 		t.withEnv("FLOCI_SERVICES_RDS_ENDPOINT_HOST", c.EndpointHost)
+	} else {
+		// The latest config wins: drop a host an earlier config set, so the Docker-host default applies.
+		delete(t.envVars, "FLOCI_SERVICES_RDS_ENDPOINT_HOST")
 	}
 }
 
