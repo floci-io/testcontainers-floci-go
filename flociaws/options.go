@@ -1,4 +1,4 @@
-package floci
+package flociaws
 
 // Package-level options for Run. Each one mirrors the FlociContainer builder method of the
 // same name, so a test written against the builder ports by replacing c.WithX(v) with

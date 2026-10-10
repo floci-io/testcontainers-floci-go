@@ -1,10 +1,12 @@
-package floci
+package flociaws
 
 import (
 	"testing"
 
 	"github.com/moby/moby/api/types/container"
 	"github.com/testcontainers/testcontainers-go"
+
+	"github.com/floci-io/testcontainers-floci-go/internal/core"
 )
 
 // Option must satisfy testcontainers.ContainerCustomizer so it can be passed to Run
@@ -25,6 +27,8 @@ func disableSocketServices(c *FlociContainer) {
 	c.WithMskConfig(MskConfig{})
 	c.WithOpenSearchConfig(OpenSearchConfig{})
 	c.WithRdsConfig(RdsConfig{})
+	// Neptune has no typed config here yet; it is switched off through its env var.
+	c.withEnv(awsDescriptor.ServiceEnv("NEPTUNE", "ENABLED"), "false")
 }
 
 func TestDockerSocket_DefaultsMountIt(t *testing.T) {
@@ -162,7 +166,7 @@ func mountsDockerSocket(req *testcontainers.GenericContainerRequest) bool {
 	hc := &container.HostConfig{}
 	req.HostConfigModifier(hc)
 	for _, b := range hc.Binds {
-		if b == dockerSocket+":"+dockerSocket {
+		if b == core.DockerSocket+":"+core.DockerSocket {
 			return true
 		}
 	}
@@ -202,8 +206,8 @@ func TestRequest_GenericEnvEnablingServiceMountsSocket(t *testing.T) {
 // Disabling every container-backed service through a generic env override must drop the socket.
 func TestRequest_GenericEnvDisablingServicesDropsSocket(t *testing.T) {
 	env := map[string]string{}
-	for _, svc := range dockerSocketServices {
-		env["FLOCI_SERVICES_"+svc.token+"_ENABLED"] = "false"
+	for _, svc := range awsDescriptor.SocketServices {
+		env["FLOCI_SERVICES_"+svc.Token+"_ENABLED"] = "false"
 	}
 	req, _ := buildRequest(t, newBuilder(), testcontainers.WithEnv(env))
 	if mountsDockerSocket(req) {
@@ -231,9 +235,25 @@ func TestRequest_CallerHostConfigModifierIsKept(t *testing.T) {
 	var callerBind, socketBind bool
 	for _, b := range hc.Binds {
 		callerBind = callerBind || b == "/tmp/data:/data"
-		socketBind = socketBind || b == dockerSocket+":"+dockerSocket
+		socketBind = socketBind || b == core.DockerSocket+":"+core.DockerSocket
 	}
 	if !callerBind || !socketBind {
 		t.Fatalf("expected both the caller's bind and the socket bind, got %v", hc.Binds)
+	}
+}
+
+// Each start gets its own resource namespace, so two containers from one builder never share
+// sibling container names; a namespace the caller chose is kept.
+func TestRequest_FreshNamespacePerStart(t *testing.T) {
+	key := awsDescriptor.ResourceNamespaceEnv()
+	b := newBuilder()
+	first, second := b.request().Env[key], b.request().Env[key]
+	if first == second || first == b.generatedNamespace {
+		t.Fatalf("namespaces %q and %q should be fresh and distinct", first, second)
+	}
+
+	b.withEnv(key, "ci-42")
+	if got := b.request().Env[key]; got != "ci-42" {
+		t.Fatalf("caller's namespace = %q, want ci-42", got)
 	}
 }

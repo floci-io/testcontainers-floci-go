@@ -17,14 +17,14 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/lambda"
 	ltypes "github.com/aws/aws-sdk-go-v2/service/lambda/types"
 
-	floci "github.com/floci-io/testcontainers-floci-go"
+	"github.com/floci-io/testcontainers-floci-go/flociaws"
 	"github.com/testcontainers/testcontainers-go"
 )
 
 func TestLambdaExample(t *testing.T) {
 	ctx := context.Background()
 
-	fc, err := floci.Run(ctx, "floci/floci:latest", floci.WithDedicatedNetwork())
+	fc, err := flociaws.Run(ctx, "floci/floci:latest", flociaws.WithDedicatedNetwork())
 	testcontainers.CleanupContainer(t, fc)
 	if err != nil {
 		t.Fatalf("starting floci: %v", err)

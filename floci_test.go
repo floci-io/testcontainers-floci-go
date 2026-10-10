@@ -1,149 +1,35 @@
 package floci_test
 
 import (
-	"context"
 	"testing"
 
-	floci "github.com/floci-io/testcontainers-floci-go"
 	"github.com/testcontainers/testcontainers-go"
+
+	floci "github.com/floci-io/testcontainers-floci-go"
+	"github.com/floci-io/testcontainers-floci-go/flociaws"
 )
 
-const testImage = "floci/floci:latest"
+// The root package is a set of aliases: its types are the flociaws types, so values pass
+// between the two import paths freely and old code keeps compiling.
+var (
+	_ *flociaws.Container      = (*floci.Container)(nil)
+	_ *flociaws.FlociContainer = (*floci.FlociContainer)(nil)
+	_ flociaws.Option          = floci.WithRegion("eu-west-1")
+	_ flociaws.S3Config        = floci.DefaultS3Config()
+)
 
-func TestRun_DefaultConfig(t *testing.T) {
-	ctx := context.Background()
+// Container still embeds testcontainers.Container under its usual field name, so code that sets
+// or reads that field keeps compiling through both import paths.
+var (
+	_ = floci.Container{Container: testcontainers.Container(nil)}
+	_ = func(c *floci.Container) testcontainers.Container { return c.Container }
+)
 
-	container, err := floci.Run(ctx, testImage)
-	testcontainers.CleanupContainer(t, container)
-	if err != nil {
-		t.Fatalf("starting container: %v", err)
+func TestRootAliasesMatchFlociaws(t *testing.T) {
+	if floci.DefaultRegion != flociaws.DefaultRegion {
+		t.Fatalf("DefaultRegion = %q, want %q", floci.DefaultRegion, flociaws.DefaultRegion)
 	}
-
-	if container.GetEndpoint() == "" {
-		t.Error("expected non-empty endpoint")
-	}
-	if container.GetRegion() != floci.DefaultRegion {
-		t.Errorf("expected region %q, got %q", floci.DefaultRegion, container.GetRegion())
-	}
-	if container.GetAccessKey() != floci.DefaultAccessKey {
-		t.Errorf("expected access key %q, got %q", floci.DefaultAccessKey, container.GetAccessKey())
-	}
-	if container.GetSecretKey() != floci.DefaultSecretKey {
-		t.Errorf("expected secret key %q, got %q", floci.DefaultSecretKey, container.GetSecretKey())
-	}
-	if container.GetAccountID() != floci.DefaultAccountID {
-		t.Errorf("expected account ID %q, got %q", floci.DefaultAccountID, container.GetAccountID())
-	}
-	t.Logf("endpoint: %s", container.GetEndpoint())
-}
-
-func TestRun_CustomRegion(t *testing.T) {
-	ctx := context.Background()
-
-	container, err := floci.Run(ctx, testImage, floci.WithRegion("eu-west-1"))
-	testcontainers.CleanupContainer(t, container)
-	if err != nil {
-		t.Fatalf("starting container: %v", err)
-	}
-
-	if container.GetRegion() != "eu-west-1" {
-		t.Errorf("expected region %q, got %q", "eu-west-1", container.GetRegion())
-	}
-}
-
-func TestRun_DedicatedNetwork(t *testing.T) {
-	ctx := context.Background()
-
-	container, err := floci.Run(ctx, testImage, floci.WithDedicatedNetwork())
-	testcontainers.CleanupContainer(t, container)
-	if err != nil {
-		t.Fatalf("starting container: %v", err)
-	}
-
-	if container.GetDedicatedNetworkName() == "" {
-		t.Error("expected non-empty dedicated network name")
-	}
-	t.Logf("network: %s", container.GetDedicatedNetworkName())
-}
-
-func TestRun_ServiceConfigs(t *testing.T) {
-	ctx := context.Background()
-
-	container, err := floci.Run(ctx, testImage,
-		floci.WithS3Config(floci.S3Config{
-			Enabled:                     true,
-			DefaultPresignExpirySeconds: 7200,
-		}),
-		floci.WithSqsConfig(floci.SqsConfig{
-			Enabled:                  true,
-			DefaultVisibilityTimeout: 60,
-			MaxMessageSize:           131072,
-		}),
-		floci.WithDynamoDbConfig(floci.DynamoDbConfig{Enabled: true}),
-	)
-	testcontainers.CleanupContainer(t, container)
-	if err != nil {
-		t.Fatalf("starting container: %v", err)
-	}
-
-	t.Logf("endpoint: %s", container.GetEndpoint())
-}
-
-// Generic testcontainers options compose with Floci options, and the returned
-// Container exposes the embedded testcontainers.Container API.
-func TestRun_GenericCustomizer(t *testing.T) {
-	ctx := context.Background()
-
-	container, err := floci.Run(ctx, testImage,
-		floci.WithRegion("eu-west-1"),
-		testcontainers.WithEnv(map[string]string{
-			"FLOCI_TEST_MARKER":        "from-generic-option",
-			"FLOCI_DEFAULT_ACCOUNT_ID": "111122223333", // overrides the module default
-		}),
-	)
-	testcontainers.CleanupContainer(t, container)
-	if err != nil {
-		t.Fatalf("starting container: %v", err)
-	}
-
-	inspect, err := container.Inspect(ctx)
-	if err != nil {
-		t.Fatalf("inspecting container: %v", err)
-	}
-	want := map[string]bool{
-		"FLOCI_TEST_MARKER=from-generic-option": false,
-		"FLOCI_DEFAULT_REGION=eu-west-1":        false,
-	}
-	for _, env := range inspect.Config.Env {
-		if _, ok := want[env]; ok {
-			want[env] = true
-		}
-	}
-	for env, found := range want {
-		if !found {
-			t.Errorf("expected container env %q", env)
-		}
-	}
-	// The getters report what the emulator actually runs with, including generic overrides.
-	if got := container.GetAccountID(); got != "111122223333" {
-		t.Errorf("GetAccountID() = %q, want the WithEnv override %q", got, "111122223333")
-	}
-	if got := container.GetRegion(); got != "eu-west-1" {
-		t.Errorf("GetRegion() = %q, want %q", got, "eu-west-1")
-	}
-}
-
-// The deprecated builder API keeps working on top of Run.
-func TestDeprecatedBuilder_StillStarts(t *testing.T) {
-	ctx := context.Background()
-
-	//nolint:staticcheck // exercising the deprecated API on purpose
-	container, err := floci.NewFlociContainer().WithRegion("eu-west-2").Start(ctx)
-	testcontainers.CleanupContainer(t, container)
-	if err != nil {
-		t.Fatalf("starting container: %v", err)
-	}
-	if container.GetRegion() != "eu-west-2" {
-		t.Errorf("expected region %q, got %q", "eu-west-2", container.GetRegion())
+	if got, want := floci.DefaultSqsConfig(), flociaws.DefaultSqsConfig(); got != want {
+		t.Fatalf("DefaultSqsConfig() = %+v, want %+v", got, want)
 	}
 }

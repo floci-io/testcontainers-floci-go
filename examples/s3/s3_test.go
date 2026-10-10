@@ -13,7 +13,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 
-	floci "github.com/floci-io/testcontainers-floci-go"
+	"github.com/floci-io/testcontainers-floci-go/flociaws"
 	"github.com/testcontainers/testcontainers-go"
 )
 
@@ -21,7 +21,7 @@ func TestS3Example(t *testing.T) {
 	ctx := context.Background()
 
 	// Start Floci
-	fc, err := floci.Run(ctx, "floci/floci:latest")
+	fc, err := flociaws.Run(ctx, "floci/floci:latest")
 	testcontainers.CleanupContainer(t, fc)
 	if err != nil {
 		t.Fatalf("starting floci: %v", err)
