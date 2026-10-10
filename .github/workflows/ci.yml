@@ -45,7 +45,10 @@ jobs:
           go get github.com/testcontainers/testcontainers-go@${{ matrix.tc-version }}
           go mod tidy
 
-      - name: Pull Floci image
+      - name: Pull pinned images
+        run: grep -v '^\s*\(#\|$\)' .github/docker-images.txt | xargs -n1 docker pull
+
+      - name: Pull the example image
         run: docker pull floci/floci:latest
 
       - name: Run tests

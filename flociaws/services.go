@@ -535,6 +535,9 @@ type RdsConfig struct {
 	// ExposeProxyPorts publishes ports [ProxyBasePort,
 	// ProxyBasePort+ProxyPortCount) to the host.
 	ExposeProxyPorts bool
+	// EndpointHost is the hostname Floci advertises in RDS endpoints. Empty means the Docker
+	// host, so clients on the host can connect (Floci then advertises the published port).
+	EndpointHost string
 }
 
 func DefaultRdsConfig() RdsConfig {
@@ -554,6 +557,9 @@ func (c RdsConfig) applyEnvVars(t *FlociContainer) {
 	t.withEnv("FLOCI_SERVICES_RDS_DEFAULT_POSTGRES_IMAGE", c.DefaultPostgresImage)
 	t.withEnv("FLOCI_SERVICES_RDS_DEFAULT_MYSQL_IMAGE", c.DefaultMysqlImage)
 	t.withEnv("FLOCI_SERVICES_RDS_DEFAULT_MARIADB_IMAGE", c.DefaultMariadbImage)
+	if c.EndpointHost != "" {
+		t.withEnv("FLOCI_SERVICES_RDS_ENDPOINT_HOST", c.EndpointHost)
+	}
 }
 
 func (c RdsConfig) applyExposedPorts(t *FlociContainer) {
