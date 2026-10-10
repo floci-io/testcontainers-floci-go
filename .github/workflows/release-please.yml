@@ -1,0 +1,118 @@
+name: Release Please
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: >-
+          Existing release tag to (re)verify on the Go proxy and security-scan (e.g. v1.0.0), bypassing
+          the release-please gate. Use this to recover a release whose tag/GitHub Release was created
+          out-of-band (so release-please never reported release_created=true) or to re-run a failed
+          publish/security-scan job. Leave empty to run release-please normally: it may update the
+          release PR, or tag and publish a release PR that has been merged.
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  # Step 1: Maintain the release PR (version bump + changelog) and, once it is merged,
+  # tag the release and create the GitHub Release.
+  release-please:
+    # A tag recovery skips this job, so a release-please failure (e.g. an expired GH_TOKEN) cannot
+    # block re-publishing an existing tag.
+    if: inputs.tag == ''
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+    outputs:
+      release-created: ${{ steps.release.outputs.release_created }}
+      tag-name: ${{ steps.release.outputs.tag_name }}
+    steps:
+      - uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
+        id: release
+        with:
+          token: ${{ secrets.GH_TOKEN }}
+          target-branch: main
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+
+  # Step 2: Go modules are published by the tag itself; make the proxy fetch it so
+  # `go get ...@latest` resolves the new version right away, and fail if it cannot.
+  publish:
+    needs: release-please
+    if: >-
+      !cancelled() && (inputs.tag != '' ||
+      (needs.release-please.result == 'success' && needs.release-please.outputs.release-created == 'true'))
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: stable
+
+      - name: Fetch module from the Go proxy
+        env:
+          VERSION: ${{ inputs.tag || needs.release-please.outputs.tag-name }}
+        run: |
+          # Only a release tag: a branch or commit typed into the tag input is rejected.
+          git ls-remote --exit-code --tags "https://github.com/${GITHUB_REPOSITORY}" "refs/tags/${VERSION}" >/dev/null \
+            || { echo "::error::${VERSION} is not a tag of ${GITHUB_REPOSITORY}"; exit 1; }
+          GOPROXY="https://proxy.golang.org" \
+            go list -m "github.com/floci-io/testcontainers-floci-go@${VERSION}"
+          echo "github.com/floci-io/testcontainers-floci-go@${VERSION} is available on the Go proxy."
+
+  # Step 3: Run security scanners against the release tag
+  security-scan:
+    needs: release-please
+    if: >-
+      !cancelled() && (inputs.tag != '' ||
+      (needs.release-please.result == 'success' && needs.release-please.outputs.release-created == 'true'))
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      security-events: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: refs/tags/${{ inputs.tag || needs.release-please.outputs.tag-name }}
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
+        with:
+          languages: go
+
+      - name: Build for analysis
+        run: go build ./...
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: fs
+          format: sarif
+          output: trivy-results.sarif
+          severity: CRITICAL,HIGH
+
+      - name: Upload Trivy results to GitHub Security
+        uses: github/codeql-action/upload-sarif@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
+        if: always()
+        with:
+          sarif_file: trivy-results.sarif
+          category: trivy
+
+      - name: Submit Dependency Snapshot
+        uses: actions/go-dependency-submission@f35d5c9af13ce9cc32f7930b171e315e878f6921 # v2.0.3
+        with:
+          go-mod-path: go.mod

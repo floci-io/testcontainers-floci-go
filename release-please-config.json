@@ -1,0 +1,10 @@
+{
+  "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
+  "release-type": "go",
+  "changelog-path": "CHANGELOG.md",
+  "include-component-in-tag": false,
+  "last-release-sha": "82b138cd841fa8ef4c79eca702f56850b01ff468",
+  "packages": {
+    ".": {}
+  }
+}
