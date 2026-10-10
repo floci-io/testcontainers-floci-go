@@ -49,6 +49,8 @@ var awsDescriptor = core.Descriptor{
 	ResetPath:      "/_floci/state/reset",
 	LogLevelEnv:    "QUARKUS_LOG_CATEGORY__IO_GITHUB_HECTORVENT__LEVEL",
 	StartupTimeout: 120 * time.Second,
+	// RDS clients connect to the endpoint the API returns, so it must be reachable from the host.
+	HostSettings: []core.HostSetting{{Token: "RDS", Setting: "ENDPOINT_HOST"}},
 	// Services that spawn sibling containers, mirroring requiresDockerSocket() in the Java module.
 	SocketServices: []core.SocketService{
 		{Token: "ATHENA", Mockable: true},
