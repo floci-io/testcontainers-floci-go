@@ -237,9 +237,14 @@ fc, err := flociaws.Run(ctx, "floci/floci:latest",
     flociaws.WithRdsConfig(flociaws.RdsConfig{
         Enabled:              true,
         DefaultPostgresImage: "postgres:16-alpine",
+        ExposeProxyPorts:     true, // reach the databases from the host
     }),
 )
 ```
+
+The module sets `FLOCI_SERVICES_RDS_ENDPOINT_HOST` to the Docker host, so `DescribeDBInstances` returns an
+endpoint (host and published port) that a client on the host can connect to, on Linux, macOS and Windows alike.
+Set `RdsConfig.EndpointHost` to advertise another hostname.
 
 #### ElastiCache (Redis / Valkey)
 
@@ -364,6 +369,14 @@ fc, err := flociaws.Run(ctx, "floci/floci:latest",
 ```
 
 The network is removed when the container is terminated (`testcontainers.CleanupContainer` or `Terminate`).
+
+### Sibling containers
+
+Floci manages the containers it spawns (databases, Lambda runtimes, the ECR registry, …); the testcontainers
+reaper does not track them. `Terminate` (and so `testcontainers.CleanupContainer`) removes every one of them after
+stopping Floci, found by the `floci_namespace` label that holds the container's resource namespace. Containers that
+share a namespace (set through `testcontainers.WithEnv` on `FLOCI_DOCKER_RESOURCE_NAMESPACE`) lose their
+siblings together.
 
 ### Docker socket
 

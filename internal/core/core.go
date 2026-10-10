@@ -16,6 +16,7 @@ import (
 	"time"
 
 	dockercontainer "github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/client"
 	"github.com/testcontainers/testcontainers-go"
 	tcnetwork "github.com/testcontainers/testcontainers-go/network"
 	"github.com/testcontainers/testcontainers-go/wait"
@@ -32,6 +33,18 @@ type SocketService struct {
 	Mockable bool
 }
 
+// HostSetting is a service setting that must name a host the test process can reach, such
+// as the AWS RDS endpoint host. When the service is enabled and the setting is unset, the
+// core sets it to the Docker host.
+type HostSetting struct {
+	Token   string
+	Setting string
+}
+
+// NamespaceLabel is the label every Floci emulator puts on the sibling containers it spawns,
+// holding its DOCKER_RESOURCE_NAMESPACE.
+const NamespaceLabel = "floci_namespace"
+
 // Descriptor holds the facts that tell one Floci emulator apart from another.
 type Descriptor struct {
 	Name           string // short cloud name, e.g. "aws"
@@ -43,6 +56,7 @@ type Descriptor struct {
 	LogLevelEnv    string // env var that sets the emulator's log level
 	StartupTimeout time.Duration
 	SocketServices []SocketService
+	HostSettings   []HostSetting
 }
 
 // PortSpec is the edge port in testcontainers' "4566/tcp" form.
@@ -73,6 +87,12 @@ func (d Descriptor) DockerSocketRequired(env map[string]string) bool {
 		return true
 	}
 	return false
+}
+
+// serviceEnabled reports whether a service is enabled in env; a missing key means enabled.
+func (d Descriptor) serviceEnabled(env map[string]string, token string) bool {
+	enabled, ok := env[d.ServiceEnv(token, "ENABLED")]
+	return !ok || strings.EqualFold(enabled, "true")
 }
 
 // NewNamespace returns a unique resource namespace such as "tc-1a2b3c4d".
@@ -126,6 +146,9 @@ func (r Request) Options(network *testcontainers.DockerNetwork, customizers []te
 
 	finalEnv := map[string]string{}
 	opts = append(opts, testcontainers.CustomizeRequestOption(func(req *testcontainers.GenericContainerRequest) error {
+		if err := r.setHostSettings(req); err != nil {
+			return err
+		}
 		finalEnv = maps.Clone(req.Env)
 		if r.NeedsDockerSocket(req.Env) {
 			// Chain rather than replace, so a caller's WithHostConfigModifier still runs.
@@ -140,6 +163,43 @@ func (r Request) Options(network *testcontainers.DockerNetwork, customizers []te
 		return nil
 	}))
 	return opts, &finalEnv
+}
+
+// setHostSettings points every unset host setting of an enabled service at the Docker host,
+// so the emulator advertises addresses the test process can reach. Without it Floci advertises
+// sibling containers' bridge addresses, which only a Linux host can reach.
+func (r Request) setHostSettings(req *testcontainers.GenericContainerRequest) error {
+	host := ""
+	for _, hs := range r.Descriptor.HostSettings {
+		key := r.Descriptor.ServiceEnv(hs.Token, hs.Setting)
+		if _, set := req.Env[key]; set || !r.Descriptor.serviceEnabled(req.Env, hs.Token) {
+			continue
+		}
+		if host == "" {
+			h, err := dockerHost()
+			if err != nil {
+				// No Docker to ask: the start fails on its own, so leave Floci's default.
+				return nil
+			}
+			host = h
+		}
+		if req.Env == nil {
+			req.Env = map[string]string{}
+		}
+		req.Env[key] = host
+	}
+	return nil
+}
+
+// dockerHost is the host the test process reaches published ports on, as testcontainers
+// resolves it (TESTCONTAINERS_HOST_OVERRIDE, a remote daemon, or the gateway inside a container).
+func dockerHost() (string, error) {
+	provider, err := testcontainers.NewDockerProvider()
+	if err != nil {
+		return "", err
+	}
+	defer provider.Close()
+	return provider.DaemonHost(context.Background())
 }
 
 // Run starts the emulator described by r. The returned container is non-nil whenever the
@@ -234,13 +294,40 @@ func (c *Container) Terminate(ctx context.Context, opts ...testcontainers.Termin
 	return errors.Join(c.Container.Terminate(ctx, opts...), c.Cleanup(ctx))
 }
 
-// Cleanup removes what outlives the emulator container: the dedicated network, if any. Call it
-// after the emulator container is gone; Terminate does both.
+// Cleanup removes what outlives the emulator container: the sibling containers it spawned (those
+// labelled with its resource namespace), then the dedicated network, if any. Siblings are managed
+// by Floci, not by the testcontainers reaper, so without this they outlive the test run; a leaked
+// one with a fixed host port, such as the AWS ECR registry, blocks the next run. Containers sharing
+// a namespace (set through the env) lose their siblings too. Call it after the emulator container
+// is gone; Terminate does both.
 func (c *Container) Cleanup(ctx context.Context) error {
+	if c.resourceNamespace != "" {
+		removeSiblings(ctx, c.resourceNamespace)
+	}
 	if c.network != nil {
 		if err := c.network.Remove(ctx); err != nil {
 			return fmt.Errorf("removing network: %w", err)
 		}
 	}
 	return nil
+}
+
+// removeSiblings removes every container labelled with the given resource namespace. It is
+// best effort: teardown never fails over leftover siblings.
+func removeSiblings(ctx context.Context, resourceNamespace string) {
+	cli, err := testcontainers.NewDockerClientWithOpts(ctx)
+	if err != nil {
+		return
+	}
+	defer cli.Close()
+	list, err := cli.ContainerList(ctx, client.ContainerListOptions{
+		All:     true,
+		Filters: client.Filters{}.Add("label", NamespaceLabel+"="+resourceNamespace),
+	})
+	if err != nil {
+		return
+	}
+	for _, sibling := range list.Items {
+		_, _ = cli.ContainerRemove(ctx, sibling.ID, client.ContainerRemoveOptions{Force: true, RemoveVolumes: true})
+	}
 }

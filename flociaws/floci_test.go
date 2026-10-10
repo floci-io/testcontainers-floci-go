@@ -13,8 +13,6 @@ import (
 	"github.com/testcontainers/testcontainers-go"
 )
 
-const testImage = "floci/floci:latest"
-
 func TestRun_DefaultConfig(t *testing.T) {
 	ctx := context.Background()
 

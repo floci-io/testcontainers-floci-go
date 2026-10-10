@@ -257,3 +257,18 @@ func TestRequest_FreshNamespacePerStart(t *testing.T) {
 		t.Fatalf("caller's namespace = %q, want ci-42", got)
 	}
 }
+
+// The latest RdsConfig wins: one without EndpointHost drops the host an earlier one set, so the
+// Docker-host default applies again.
+func TestRdsConfig_LatestEndpointHostWins(t *testing.T) {
+	key := "FLOCI_SERVICES_RDS_ENDPOINT_HOST"
+	c := newBuilder()
+	c.WithRdsConfig(RdsConfig{Enabled: true, EndpointHost: "rds.example.com"})
+	if got := c.envVars[key]; got != "rds.example.com" {
+		t.Fatalf("%s = %q, want rds.example.com", key, got)
+	}
+	c.WithRdsConfig(DefaultRdsConfig())
+	if got, ok := c.envVars[key]; ok {
+		t.Fatalf("%s still set to %q", key, got)
+	}
+}
