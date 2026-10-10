@@ -60,6 +60,9 @@ jobs:
         env:
           VERSION: ${{ inputs.tag || needs.release-please.outputs.tag-name }}
         run: |
+          # Only a release tag: a branch or commit typed into the tag input is rejected.
+          git ls-remote --exit-code --tags "https://github.com/${GITHUB_REPOSITORY}" "refs/tags/${VERSION}" >/dev/null \
+            || { echo "::error::${VERSION} is not a tag of ${GITHUB_REPOSITORY}"; exit 1; }
           GOPROXY="https://proxy.golang.org" \
             go list -m "github.com/floci-io/testcontainers-floci-go@${VERSION}"
           echo "github.com/floci-io/testcontainers-floci-go@${VERSION} is available on the Go proxy."
@@ -77,7 +80,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ inputs.tag || needs.release-please.outputs.tag-name }}
+          ref: refs/tags/${{ inputs.tag || needs.release-please.outputs.tag-name }}
 
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
