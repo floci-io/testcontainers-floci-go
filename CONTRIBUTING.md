@@ -30,12 +30,13 @@ go test -run TestRun_DefaultConfig .   # run a single test
 
 ## Branching Model
 
-Releases are cut from `main` by semantic-release; there are no release branches.
+Releases are cut from `main` by release-please; there are no release branches.
 
 | Branch / tag | Purpose | Published? |
 |---|---|---|
-| `main` | Integration branch: all PRs merge here. Every merge that changes the module is analysed for a release. | Only when a commit warrants one |
-| `vX.Y.Z` tag | A release, created by semantic-release. | Yes (Go module proxy, `pkg.go.dev` auto-indexes) |
+| `main` | Integration branch: all PRs merge here. Merging does not release anything by itself. | No |
+| release PR (`release-please--branches--main`) | Kept up to date by release-please with the next version and `CHANGELOG.md`. | When a maintainer merges it |
+| `vX.Y.Z` tag | A release, created when the release PR is merged. | Yes (Go module proxy, `pkg.go.dev` auto-indexes) |
 
 ## Developer Certificate of Origin (DCO) sign-off
 
@@ -72,9 +73,9 @@ Changes to this policy are reserved to the Lead Maintainer under
 
 ## Commit Message Format
 
-This project uses [Conventional Commits](https://www.conventionalcommits.org/) — semantic-release reads these to generate the changelog and version bumps automatically.
+This project uses [Conventional Commits](https://www.conventionalcommits.org/): release-please reads them to compute the next version and write the changelog.
 
-> **The PR title is validated automatically by CI** and must follow this format, since it becomes the squash-merge commit message that semantic-release reads.
+> **Commits are validated by CI** (`commit-lint`). Use the same format for the PR title too: it becomes the squash-merge commit message that release-please reads.
 
 ### Format
 
@@ -182,17 +183,19 @@ CI runs automatically on every pull request, and all checks must pass before mer
 
 ## Release Process (maintainers)
 
-Releases are automatic. When a PR merges to `main` and touches `*.go`, `go.mod`, `.releaserc.json` or
-`.github/workflows/semver.yml`, the `Semantic Release` workflow runs semantic-release:
+Releases follow the same release-please flow as the Java module (`.github/workflows/release-please.yml`):
 
-- `fix:` and `perf:` commits since the last `vX.Y.Z` tag produce a patch release, `feat:` a minor
-  release; `docs:`, `chore:`, `ci:`, `test:` and `refactor:` produce none.
-- It updates `CHANGELOG.md`, commits it to `main`, pushes the `vX.Y.Z` tag and creates the GitHub
-  release, which runs `publish.yml` to confirm the version on the Go module proxy.
-- The module is in v0.x. A breaking change (`feat!:` or a `BREAKING CHANGE:` footer) moves it to
-  v1.0.0, so land breaking changes deliberately.
+1. Every push to `main` lets release-please update one **release PR**. It computes the next version from
+   the Conventional Commits since the last release (`fix:`/`perf:` a patch, `feat:` a minor, `feat!:` or a
+   `BREAKING CHANGE:` footer a major; `docs:`, `chore:`, `ci:`, `test:`, `refactor:` none) and writes the
+   `CHANGELOG.md` entry. Commit messages are linted in CI (`commit-lint`), because they become the changelog.
+2. To release, review and merge the release PR. release-please then tags `vX.Y.Z` and creates the GitHub
+   release, and the same workflow confirms the version on the Go module proxy and runs the security scans
+   (CodeQL, Trivy, dependency snapshot) against the tag.
+3. To recover a release (for example a failed proxy check), run **Release Please** manually with the `tag`
+   input set to the existing tag.
 
-To release a fix, merge it to `main` with a `fix:` commit; there is nothing to cherry-pick.
+Nothing is cherry-picked: fixes merge to `main` and ship with the next release PR.
 
 ## Reporting Security Issues
 
