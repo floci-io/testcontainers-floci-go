@@ -368,7 +368,7 @@ The network is removed when the container is terminated (`testcontainers.Cleanup
 ### Docker socket
 
 Services that spawn sibling containers (Lambda, RDS, ElastiCache, ECS, EC2, EKS, ECR, MSK, OpenSearch, Athena,
-CodeBuild) need the host Docker socket. The module mounts it only while at least one of them is enabled and not in
+CodeBuild, Neptune) need the host Docker socket. The module mounts it only while at least one of them is enabled and not in
 `Mock` mode; all services are enabled by default, so a default container gets it. Override the detection with
 `flociaws.WithDockerSocket(false)` on hosts where the socket cannot be mounted (rootless Podman with SELinux, some CI
 sandboxes), or `flociaws.WithDockerSocket(true)` to always mount it.

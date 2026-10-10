@@ -17,6 +17,10 @@ package flociaws
 
 import (
 	"context"
+	"errors"
+	"fmt"
+	"maps"
+	"strconv"
 	"time"
 
 	"github.com/testcontainers/testcontainers-go"
@@ -56,6 +60,7 @@ var awsDescriptor = core.Descriptor{
 		{Token: "ELASTICACHE"},
 		{Token: "LAMBDA"},
 		{Token: "MSK", Mockable: true},
+		{Token: "NEPTUNE"},
 		{Token: "OPENSEARCH", Mockable: true},
 		{Token: "RDS"},
 	},
@@ -69,6 +74,9 @@ type FlociContainer struct {
 	dedicatedNetwork bool
 	// dockerSocket overrides socket auto-detection when non-nil (see WithDockerSocket).
 	dockerSocketOverride *bool
+	// generatedNamespace is the namespace newBuilder set; each start replaces it with a fresh
+	// one unless the caller chose their own, so two containers from one builder never share it.
+	generatedNamespace string
 
 	acmConfig                   AcmConfig
 	apiGatewayConfig            ApiGatewayConfig
@@ -175,7 +183,8 @@ func newBuilder() *FlociContainer {
 	c.withEnv("FLOCI_DEFAULT_AVAILABILITY_ZONE", DefaultAvailabilityZone)
 	// Sibling containers are named after the resource; a unique namespace per container
 	// keeps parallel test runs from colliding and makes leftovers attributable.
-	c.withEnv(awsDescriptor.ResourceNamespaceEnv(), core.NewNamespace())
+	c.generatedNamespace = core.NewNamespace()
+	c.withEnv(awsDescriptor.ResourceNamespaceEnv(), c.generatedNamespace)
 	c.applyAllConfigs()
 	return c
 }
@@ -582,10 +591,14 @@ func (c *FlociContainer) request() core.Request {
 	for port := range c.ports {
 		ports = append(ports, port)
 	}
+	env := maps.Clone(c.envVars)
+	if env[awsDescriptor.ResourceNamespaceEnv()] == c.generatedNamespace {
+		env[awsDescriptor.ResourceNamespaceEnv()] = core.NewNamespace()
+	}
 	return core.Request{
 		Descriptor:       awsDescriptor,
 		Image:            c.image,
-		Env:              c.envVars,
+		Env:              env,
 		Ports:            ports,
 		DockerSocket:     c.dockerSocketOverride,
 		DedicatedNetwork: c.dedicatedNetwork,
@@ -598,7 +611,8 @@ func (c *FlociContainer) run(ctx context.Context, customizers ...testcontainers.
 		return nil, err
 	}
 	return &Container{
-		Container:        cc,
+		Container:        cc.Container,
+		core:             cc,
 		region:           envOr(env, "FLOCI_DEFAULT_REGION", DefaultRegion),
 		availabilityZone: envOr(env, "FLOCI_DEFAULT_AVAILABILITY_ZONE", DefaultAvailabilityZone),
 		accountID:        envOr(env, "FLOCI_DEFAULT_ACCOUNT_ID", DefaultAccountID),
@@ -674,11 +688,13 @@ func (c *FlociContainer) refreshExposedPorts() {
 	c.rdsConfig.applyExposedPorts(c)
 }
 
-// Container is a running Floci container. It embeds the shared core container, which embeds
-// testcontainers.Container, so Logs, Exec, Inspect, GetEndpoint, GetMappedPort, Reset and
-// testcontainers.CleanupContainer all work on it; Terminate also removes the dedicated network.
+// Container is a running Floci container. It embeds testcontainers.Container, as it always has,
+// so Logs, Exec, Inspect and testcontainers.CleanupContainer work on it; the shared core behind
+// GetEndpoint, GetMappedPort, Reset and Terminate (which also removes the dedicated network and
+// Floci's sibling containers) is kept in an unexported field.
 type Container struct {
-	*core.Container
+	testcontainers.Container
+	core             *core.Container
 	region           string
 	availabilityZone string
 	accountID        string
@@ -691,6 +707,59 @@ var _ testcontainers.Container = (*Container)(nil)
 //
 // Deprecated: use Container.
 type StartedFlociContainer = Container
+
+// GetEndpoint returns the base URL, e.g. "http://localhost:32768".
+func (s *Container) GetEndpoint() string {
+	if s.core == nil {
+		return ""
+	}
+	return s.core.GetEndpoint()
+}
+
+// GetDedicatedNetworkName returns the dedicated Docker network name, or "" if none.
+func (s *Container) GetDedicatedNetworkName() string {
+	if s.core == nil {
+		return ""
+	}
+	return s.core.GetDedicatedNetworkName()
+}
+
+// GetResourceNamespace returns the prefix of the sibling containers' names.
+func (s *Container) GetResourceNamespace() string {
+	if s.core == nil {
+		return ""
+	}
+	return s.core.GetResourceNamespace()
+}
+
+// GetMappedPort returns the host-mapped port for a given container port.
+func (s *Container) GetMappedPort(ctx context.Context, port int) (int, error) {
+	if s.core == nil {
+		mapped, err := s.MappedPort(ctx, fmt.Sprintf("%d/tcp", port))
+		if err != nil {
+			return 0, err
+		}
+		return strconv.Atoi(mapped.Port())
+	}
+	return s.core.GetMappedPort(ctx, port)
+}
+
+// Reset wipes all emulator state (buckets, queues, tables, ...) without restarting.
+func (s *Container) Reset(ctx context.Context) error {
+	if s.core == nil {
+		return errors.New("floci: Reset needs a container started by Run")
+	}
+	return s.core.Reset(ctx)
+}
+
+// Terminate stops and removes the container, then Floci's sibling containers and the dedicated
+// network, if any.
+func (s *Container) Terminate(ctx context.Context, opts ...testcontainers.TerminateOption) error {
+	if s.core == nil {
+		return s.Container.Terminate(ctx, opts...)
+	}
+	return s.core.Terminate(ctx, opts...)
+}
 
 // GetRegion returns the configured AWS region.
 func (s *Container) GetRegion() string { return s.region }

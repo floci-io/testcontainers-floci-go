@@ -27,6 +27,8 @@ func disableSocketServices(c *FlociContainer) {
 	c.WithMskConfig(MskConfig{})
 	c.WithOpenSearchConfig(OpenSearchConfig{})
 	c.WithRdsConfig(RdsConfig{})
+	// Neptune has no typed config here yet; it is switched off through its env var.
+	c.withEnv(awsDescriptor.ServiceEnv("NEPTUNE", "ENABLED"), "false")
 }
 
 func TestDockerSocket_DefaultsMountIt(t *testing.T) {
@@ -237,5 +239,21 @@ func TestRequest_CallerHostConfigModifierIsKept(t *testing.T) {
 	}
 	if !callerBind || !socketBind {
 		t.Fatalf("expected both the caller's bind and the socket bind, got %v", hc.Binds)
+	}
+}
+
+// Each start gets its own resource namespace, so two containers from one builder never share
+// sibling container names; a namespace the caller chose is kept.
+func TestRequest_FreshNamespacePerStart(t *testing.T) {
+	key := awsDescriptor.ResourceNamespaceEnv()
+	b := newBuilder()
+	first, second := b.request().Env[key], b.request().Env[key]
+	if first == second || first == b.generatedNamespace {
+		t.Fatalf("namespaces %q and %q should be fresh and distinct", first, second)
+	}
+
+	b.withEnv(key, "ci-42")
+	if got := b.request().Env[key]; got != "ci-42" {
+		t.Fatalf("caller's namespace = %q, want ci-42", got)
 	}
 }

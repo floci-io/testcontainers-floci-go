@@ -4,6 +4,11 @@ import (
 	"context"
 	"testing"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/credentials"
+	"github.com/aws/aws-sdk-go-v2/service/sqs"
+
 	floci "github.com/floci-io/testcontainers-floci-go/flociaws"
 	"github.com/testcontainers/testcontainers-go"
 )
@@ -148,7 +153,8 @@ func TestDeprecatedBuilder_StillStarts(t *testing.T) {
 	}
 }
 
-// Reset wipes emulator state through the core's reset endpoint; the container keeps running.
+// Reset wipes emulator state through the core's reset endpoint; the container keeps running
+// and serves new requests.
 func TestRun_Reset(t *testing.T) {
 	ctx := context.Background()
 
@@ -157,10 +163,31 @@ func TestRun_Reset(t *testing.T) {
 	if err != nil {
 		t.Fatalf("starting container: %v", err)
 	}
+	cfg, err := config.LoadDefaultConfig(ctx,
+		config.WithRegion(container.GetRegion()),
+		config.WithBaseEndpoint(container.GetEndpoint()),
+		config.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(
+			container.GetAccessKey(), container.GetSecretKey(), "")))
+	if err != nil {
+		t.Fatalf("aws config: %v", err)
+	}
+	client := sqs.NewFromConfig(cfg)
+	if _, err := client.CreateQueue(ctx, &sqs.CreateQueueInput{QueueName: aws.String("before-reset")}); err != nil {
+		t.Fatalf("create queue: %v", err)
+	}
+
 	if err := container.Reset(ctx); err != nil {
 		t.Fatalf("reset: %v", err)
 	}
-	if ns := container.GetResourceNamespace(); len(ns) != len("tc-12345678") {
-		t.Errorf("unexpected resource namespace %q", ns)
+
+	queues, err := client.ListQueues(ctx, &sqs.ListQueuesInput{})
+	if err != nil {
+		t.Fatalf("list queues after reset: %v", err)
+	}
+	if len(queues.QueueUrls) != 0 {
+		t.Fatalf("queues survived the reset: %v", queues.QueueUrls)
+	}
+	if _, err := client.CreateQueue(ctx, &sqs.CreateQueueInput{QueueName: aws.String("after-reset")}); err != nil {
+		t.Fatalf("create queue after reset: %v", err)
 	}
 }
