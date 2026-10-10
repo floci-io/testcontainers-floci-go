@@ -1,4 +1,4 @@
-package floci
+package flociaws
 
 import "testing"
 

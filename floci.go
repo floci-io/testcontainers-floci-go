@@ -1,778 +1,463 @@
-// Package floci provides a Testcontainers module for Floci — a free, open-source local AWS emulator.
+// Package floci is the original import path of the Floci AWS module, kept so existing code
+// keeps compiling. Every name here is an alias of the same name in package flociaws, the
+// module's home for AWS alongside the other Floci clouds:
 //
-// Example:
+//	import "github.com/floci-io/testcontainers-floci-go/flociaws"
 //
-//	fc, err := floci.Run(ctx, "floci/floci:latest")
-//	testcontainers.CleanupContainer(t, fc)
-//	if err != nil { ... }
+//	fc, err := flociaws.Run(ctx, "floci/floci:latest", flociaws.WithRegion("eu-west-1"))
 //
-//	cfg, _ := config.LoadDefaultConfig(ctx,
-//	    config.WithRegion(fc.GetRegion()),
-//	    config.WithBaseEndpoint(fc.GetEndpoint()),
-//	    config.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(
-//	        fc.GetAccessKey(), fc.GetSecretKey(), "",
-//	    )),
-//	)
+// Deprecated: use package github.com/floci-io/testcontainers-floci-go/flociaws.
 package floci
 
 import (
 	"context"
-	"errors"
-	"fmt"
-	"maps"
-	"net/http"
-	"strconv"
-	"time"
 
-	dockercontainer "github.com/moby/moby/api/types/container"
 	"github.com/testcontainers/testcontainers-go"
-	tcnetwork "github.com/testcontainers/testcontainers-go/network"
-	"github.com/testcontainers/testcontainers-go/wait"
+
+	"github.com/floci-io/testcontainers-floci-go/flociaws"
 )
 
+// Identity defaults of the AWS emulator.
+//
+// Deprecated: use the same name in package github.com/floci-io/testcontainers-floci-go/flociaws.
 const (
-	defaultImage   = "floci/floci:latest"
-	dockerSocket   = "/var/run/docker.sock"
-	flociPort      = 4566
-	startupTimeout = 120 * time.Second
-
-	DefaultRegion           = "us-east-1"
-	DefaultAvailabilityZone = "us-east-1a"
-	DefaultAccountID        = "000000000000"
-	DefaultAccessKey        = "test"
-	DefaultSecretKey        = "test"
+	DefaultRegion           = flociaws.DefaultRegion
+	DefaultAvailabilityZone = flociaws.DefaultAvailabilityZone
+	DefaultAccountID        = flociaws.DefaultAccountID
+	DefaultAccessKey        = flociaws.DefaultAccessKey
+	DefaultSecretKey        = flociaws.DefaultSecretKey
 )
 
-// FlociContainer is a builder for a Floci testcontainer.
-type FlociContainer struct {
-	image            string
-	envVars          map[string]string
-	ports            map[int]struct{}
-	dedicatedNetwork bool
-	// dockerSocket overrides socket auto-detection when non-nil (see WithDockerSocket).
-	dockerSocketOverride *bool
+// Deprecated: use the same name in package github.com/floci-io/testcontainers-floci-go/flociaws.
+type AcmConfig = flociaws.AcmConfig
 
-	acmConfig                   AcmConfig
-	apiGatewayConfig            ApiGatewayConfig
-	apiGatewayV2Config          ApiGatewayV2Config
-	appConfigConfig             AppConfigConfig
-	appConfigDataConfig         AppConfigDataConfig
-	athenaConfig                AthenaConfig
-	bedrockRuntimeConfig        BedrockRuntimeConfig
-	cloudFormationConfig        CloudFormationConfig
-	cloudWatchLogsConfig        CloudWatchLogsConfig
-	cloudWatchMetricsConfig     CloudWatchMetricsConfig
-	codeBuildConfig             CodeBuildConfig
-	codeDeployConfig            CodeDeployConfig
-	cognitoConfig               CognitoConfig
-	dynamoDbConfig              DynamoDbConfig
-	ec2Config                   Ec2Config
-	ecrConfig                   EcrConfig
-	ecsConfig                   EcsConfig
-	eksConfig                   EksConfig
-	elastiCacheConfig           ElastiCacheConfig
-	elbV2Config                 ElbV2Config
-	eventBridgeConfig           EventBridgeConfig
-	firehoseConfig              FirehoseConfig
-	glueConfig                  GlueConfig
-	iamConfig                   IamConfig
-	kinesisConfig               KinesisConfig
-	kmsConfig                   KmsConfig
-	lambdaConfig                LambdaConfig
-	mskConfig                   MskConfig
-	openSearchConfig            OpenSearchConfig
-	pipesConfig                 PipesConfig
-	rdsConfig                   RdsConfig
-	resourceGroupsTaggingConfig ResourceGroupsTaggingConfig
-	s3Config                    S3Config
-	schedulerConfig             SchedulerConfig
-	secretsManagerConfig        SecretsManagerConfig
-	sesConfig                   SesConfig
-	sesV2Config                 SesV2Config
-	snsConfig                   SnsConfig
-	sqsConfig                   SqsConfig
-	ssmConfig                   SsmConfig
-	stepFunctionsConfig         StepFunctionsConfig
+// Deprecated: use the same name in package github.com/floci-io/testcontainers-floci-go/flociaws.
+type ApiGatewayConfig = flociaws.ApiGatewayConfig
+
+// Deprecated: use the same name in package github.com/floci-io/testcontainers-floci-go/flociaws.
+type ApiGatewayV2Config = flociaws.ApiGatewayV2Config
+
+// Deprecated: use the same name in package github.com/floci-io/testcontainers-floci-go/flociaws.
+type AppConfigConfig = flociaws.AppConfigConfig
+
+// Deprecated: use the same name in package github.com/floci-io/testcontainers-floci-go/flociaws.
+type AppConfigDataConfig = flociaws.AppConfigDataConfig
+
+// Deprecated: use the same name in package github.com/floci-io/testcontainers-floci-go/flociaws.
+type AthenaConfig = flociaws.AthenaConfig
+
+// Deprecated: use the same name in package github.com/floci-io/testcontainers-floci-go/flociaws.
+type BedrockRuntimeConfig = flociaws.BedrockRuntimeConfig
+
+// Deprecated: use the same name in package github.com/floci-io/testcontainers-floci-go/flociaws.
+type CloudFormationConfig = flociaws.CloudFormationConfig
+
+// Deprecated: use the same name in package github.com/floci-io/testcontainers-floci-go/flociaws.
+type CloudWatchLogsConfig = flociaws.CloudWatchLogsConfig
+
+// Deprecated: use the same name in package github.com/floci-io/testcontainers-floci-go/flociaws.
+type CloudWatchMetricsConfig = flociaws.CloudWatchMetricsConfig
+
+// Deprecated: use the same name in package github.com/floci-io/testcontainers-floci-go/flociaws.
+type CodeBuildConfig = flociaws.CodeBuildConfig
+
+// Deprecated: use the same name in package github.com/floci-io/testcontainers-floci-go/flociaws.
+type CodeDeployConfig = flociaws.CodeDeployConfig
+
+// Deprecated: use the same name in package github.com/floci-io/testcontainers-floci-go/flociaws.
+type CognitoConfig = flociaws.CognitoConfig
+
+// Deprecated: use the same name in package github.com/floci-io/testcontainers-floci-go/flociaws.
+type Container = flociaws.Container
+
+// Deprecated: use the same name in package github.com/floci-io/testcontainers-floci-go/flociaws.
+type DynamoDbConfig = flociaws.DynamoDbConfig
+
+// Deprecated: use the same name in package github.com/floci-io/testcontainers-floci-go/flociaws.
+type Ec2Config = flociaws.Ec2Config
+
+// Deprecated: use the same name in package github.com/floci-io/testcontainers-floci-go/flociaws.
+type EcrConfig = flociaws.EcrConfig
+
+// Deprecated: use the same name in package github.com/floci-io/testcontainers-floci-go/flociaws.
+type EcsConfig = flociaws.EcsConfig
+
+// Deprecated: use the same name in package github.com/floci-io/testcontainers-floci-go/flociaws.
+type EksConfig = flociaws.EksConfig
+
+// Deprecated: use the same name in package github.com/floci-io/testcontainers-floci-go/flociaws.
+type ElastiCacheConfig = flociaws.ElastiCacheConfig
+
+// Deprecated: use the same name in package github.com/floci-io/testcontainers-floci-go/flociaws.
+type ElbV2Config = flociaws.ElbV2Config
+
+// Deprecated: use the same name in package github.com/floci-io/testcontainers-floci-go/flociaws.
+type EventBridgeConfig = flociaws.EventBridgeConfig
+
+// Deprecated: use the same name in package github.com/floci-io/testcontainers-floci-go/flociaws.
+type FirehoseConfig = flociaws.FirehoseConfig
+
+// Deprecated: use the same name in package github.com/floci-io/testcontainers-floci-go/flociaws.
+type FlociContainer = flociaws.FlociContainer
+
+// Deprecated: use the same name in package github.com/floci-io/testcontainers-floci-go/flociaws.
+type GlueConfig = flociaws.GlueConfig
+
+// Deprecated: use the same name in package github.com/floci-io/testcontainers-floci-go/flociaws.
+type IamConfig = flociaws.IamConfig
+
+// Deprecated: use the same name in package github.com/floci-io/testcontainers-floci-go/flociaws.
+type KinesisConfig = flociaws.KinesisConfig
+
+// Deprecated: use the same name in package github.com/floci-io/testcontainers-floci-go/flociaws.
+type KmsConfig = flociaws.KmsConfig
+
+// Deprecated: use the same name in package github.com/floci-io/testcontainers-floci-go/flociaws.
+type LambdaConfig = flociaws.LambdaConfig
+
+// Deprecated: use the same name in package github.com/floci-io/testcontainers-floci-go/flociaws.
+type MskConfig = flociaws.MskConfig
+
+// Deprecated: use the same name in package github.com/floci-io/testcontainers-floci-go/flociaws.
+type OpenSearchConfig = flociaws.OpenSearchConfig
+
+// Deprecated: use the same name in package github.com/floci-io/testcontainers-floci-go/flociaws.
+type Option = flociaws.Option
+
+// Deprecated: use the same name in package github.com/floci-io/testcontainers-floci-go/flociaws.
+type PipesConfig = flociaws.PipesConfig
+
+// Deprecated: use the same name in package github.com/floci-io/testcontainers-floci-go/flociaws.
+type RdsConfig = flociaws.RdsConfig
+
+// Deprecated: use the same name in package github.com/floci-io/testcontainers-floci-go/flociaws.
+type ResourceGroupsTaggingConfig = flociaws.ResourceGroupsTaggingConfig
+
+// Deprecated: use the same name in package github.com/floci-io/testcontainers-floci-go/flociaws.
+type S3Config = flociaws.S3Config
+
+// Deprecated: use the same name in package github.com/floci-io/testcontainers-floci-go/flociaws.
+type SchedulerConfig = flociaws.SchedulerConfig
+
+// Deprecated: use the same name in package github.com/floci-io/testcontainers-floci-go/flociaws.
+type SecretsManagerConfig = flociaws.SecretsManagerConfig
+
+// Deprecated: use the same name in package github.com/floci-io/testcontainers-floci-go/flociaws.
+type SesConfig = flociaws.SesConfig
+
+// Deprecated: use the same name in package github.com/floci-io/testcontainers-floci-go/flociaws.
+type SesV2Config = flociaws.SesV2Config
+
+// Deprecated: use the same name in package github.com/floci-io/testcontainers-floci-go/flociaws.
+type SnsConfig = flociaws.SnsConfig
+
+// Deprecated: use the same name in package github.com/floci-io/testcontainers-floci-go/flociaws.
+type SqsConfig = flociaws.SqsConfig
+
+// Deprecated: use the same name in package github.com/floci-io/testcontainers-floci-go/flociaws.
+type SsmConfig = flociaws.SsmConfig
+
+// Deprecated: use the same name in package github.com/floci-io/testcontainers-floci-go/flociaws.
+type StartedFlociContainer = flociaws.StartedFlociContainer
+
+// Deprecated: use the same name in package github.com/floci-io/testcontainers-floci-go/flociaws.
+type StepFunctionsConfig = flociaws.StepFunctionsConfig
+
+// Deprecated: use the same name in package github.com/floci-io/testcontainers-floci-go/flociaws.
+func DefaultAcmConfig() AcmConfig { return flociaws.DefaultAcmConfig() }
+
+// Deprecated: use the same name in package github.com/floci-io/testcontainers-floci-go/flociaws.
+func DefaultApiGatewayConfig() ApiGatewayConfig { return flociaws.DefaultApiGatewayConfig() }
+
+// Deprecated: use the same name in package github.com/floci-io/testcontainers-floci-go/flociaws.
+func DefaultApiGatewayV2Config() ApiGatewayV2Config { return flociaws.DefaultApiGatewayV2Config() }
+
+// Deprecated: use the same name in package github.com/floci-io/testcontainers-floci-go/flociaws.
+func DefaultAppConfigConfig() AppConfigConfig { return flociaws.DefaultAppConfigConfig() }
+
+// Deprecated: use the same name in package github.com/floci-io/testcontainers-floci-go/flociaws.
+func DefaultAppConfigDataConfig() AppConfigDataConfig { return flociaws.DefaultAppConfigDataConfig() }
+
+// Deprecated: use the same name in package github.com/floci-io/testcontainers-floci-go/flociaws.
+func DefaultAthenaConfig() AthenaConfig { return flociaws.DefaultAthenaConfig() }
+
+// Deprecated: use the same name in package github.com/floci-io/testcontainers-floci-go/flociaws.
+func DefaultBedrockRuntimeConfig() BedrockRuntimeConfig {
+	return flociaws.DefaultBedrockRuntimeConfig()
 }
 
-// NewFlociContainer creates a new FlociContainer builder with default configuration.
-//
-// Deprecated: use Run, which follows the testcontainers-go module convention:
-// floci.Run(ctx, "floci/floci:latest", floci.WithRegion("eu-west-1")).
-func NewFlociContainer() *FlociContainer {
-	return newBuilder()
+// Deprecated: use the same name in package github.com/floci-io/testcontainers-floci-go/flociaws.
+func DefaultCloudFormationConfig() CloudFormationConfig {
+	return flociaws.DefaultCloudFormationConfig()
 }
 
-func newBuilder() *FlociContainer {
-	c := &FlociContainer{
-		image:   defaultImage,
-		envVars: make(map[string]string),
-		ports:   map[int]struct{}{flociPort: {}},
-
-		acmConfig:                   DefaultAcmConfig(),
-		apiGatewayConfig:            DefaultApiGatewayConfig(),
-		apiGatewayV2Config:          DefaultApiGatewayV2Config(),
-		appConfigConfig:             DefaultAppConfigConfig(),
-		appConfigDataConfig:         DefaultAppConfigDataConfig(),
-		athenaConfig:                DefaultAthenaConfig(),
-		bedrockRuntimeConfig:        DefaultBedrockRuntimeConfig(),
-		cloudFormationConfig:        DefaultCloudFormationConfig(),
-		cloudWatchLogsConfig:        DefaultCloudWatchLogsConfig(),
-		cloudWatchMetricsConfig:     DefaultCloudWatchMetricsConfig(),
-		codeBuildConfig:             DefaultCodeBuildConfig(),
-		codeDeployConfig:            DefaultCodeDeployConfig(),
-		cognitoConfig:               DefaultCognitoConfig(),
-		dynamoDbConfig:              DefaultDynamoDbConfig(),
-		ec2Config:                   DefaultEc2Config(),
-		ecrConfig:                   DefaultEcrConfig(),
-		ecsConfig:                   DefaultEcsConfig(),
-		eksConfig:                   DefaultEksConfig(),
-		elastiCacheConfig:           DefaultElastiCacheConfig(),
-		elbV2Config:                 DefaultElbV2Config(),
-		eventBridgeConfig:           DefaultEventBridgeConfig(),
-		firehoseConfig:              DefaultFirehoseConfig(),
-		glueConfig:                  DefaultGlueConfig(),
-		iamConfig:                   DefaultIamConfig(),
-		kinesisConfig:               DefaultKinesisConfig(),
-		kmsConfig:                   DefaultKmsConfig(),
-		lambdaConfig:                DefaultLambdaConfig(),
-		mskConfig:                   DefaultMskConfig(),
-		openSearchConfig:            DefaultOpenSearchConfig(),
-		pipesConfig:                 DefaultPipesConfig(),
-		rdsConfig:                   DefaultRdsConfig(),
-		resourceGroupsTaggingConfig: DefaultResourceGroupsTaggingConfig(),
-		s3Config:                    DefaultS3Config(),
-		schedulerConfig:             DefaultSchedulerConfig(),
-		secretsManagerConfig:        DefaultSecretsManagerConfig(),
-		sesConfig:                   DefaultSesConfig(),
-		sesV2Config:                 DefaultSesV2Config(),
-		snsConfig:                   DefaultSnsConfig(),
-		sqsConfig:                   DefaultSqsConfig(),
-		ssmConfig:                   DefaultSsmConfig(),
-		stepFunctionsConfig:         DefaultStepFunctionsConfig(),
-	}
-
-	c.withEnv("FLOCI_DEFAULT_REGION", DefaultRegion)
-	c.withEnv("FLOCI_DEFAULT_ACCOUNT_ID", DefaultAccountID)
-	c.withEnv("FLOCI_DEFAULT_AVAILABILITY_ZONE", DefaultAvailabilityZone)
-	c.applyAllConfigs()
-	return c
+// Deprecated: use the same name in package github.com/floci-io/testcontainers-floci-go/flociaws.
+func DefaultCloudWatchLogsConfig() CloudWatchLogsConfig {
+	return flociaws.DefaultCloudWatchLogsConfig()
 }
 
-// Option configures Floci-specific settings. It implements
-// testcontainers.ContainerCustomizer, so Floci options and generic testcontainers
-// options can be passed to Run together:
-//
-//	floci.Run(ctx, "floci/floci:latest",
-//	    floci.WithRegion("eu-west-1"),
-//	    testcontainers.WithEnv(map[string]string{"FLOCI_LOG_LEVEL": "debug"}),
-//	)
-type Option func(*FlociContainer)
+// Deprecated: use the same name in package github.com/floci-io/testcontainers-floci-go/flociaws.
+func DefaultCloudWatchMetricsConfig() CloudWatchMetricsConfig {
+	return flociaws.DefaultCloudWatchMetricsConfig()
+}
 
-// Customize is a no-op: Floci options are applied to the module's own settings
-// before the container request is built.
-func (o Option) Customize(*testcontainers.GenericContainerRequest) error { return nil }
+// Deprecated: use the same name in package github.com/floci-io/testcontainers-floci-go/flociaws.
+func DefaultCodeBuildConfig() CodeBuildConfig { return flociaws.DefaultCodeBuildConfig() }
 
-// Run creates and starts a Floci container from the given image, following the
-// testcontainers-go module convention. Floci options (WithRegion, WithS3Config, ...)
-// configure the emulator; any other testcontainers.ContainerCustomizer is applied to
-// the container request after the module's defaults, so it can override them.
-//
-// The returned container is non-nil whenever the container was created, even if
-// Run also returns an error, so it can always be cleaned up:
-//
-//	fc, err := floci.Run(ctx, "floci/floci:latest")
-//	testcontainers.CleanupContainer(t, fc)
-//	require.NoError(t, err)
+// Deprecated: use the same name in package github.com/floci-io/testcontainers-floci-go/flociaws.
+func DefaultCodeDeployConfig() CodeDeployConfig { return flociaws.DefaultCodeDeployConfig() }
+
+// Deprecated: use the same name in package github.com/floci-io/testcontainers-floci-go/flociaws.
+func DefaultCognitoConfig() CognitoConfig { return flociaws.DefaultCognitoConfig() }
+
+// Deprecated: use the same name in package github.com/floci-io/testcontainers-floci-go/flociaws.
 func Run(ctx context.Context, img string, opts ...testcontainers.ContainerCustomizer) (*Container, error) {
-	c := newBuilder()
-	if img != "" {
-		c.image = img
-	}
-	var customizers []testcontainers.ContainerCustomizer
-	for _, opt := range opts {
-		if o, ok := opt.(Option); ok {
-			o(c)
-			continue
-		}
-		customizers = append(customizers, opt)
-	}
-	return c.run(ctx, customizers...)
+	return flociaws.Run(ctx, img, opts...)
 }
 
-func (c *FlociContainer) withEnv(key, value string) *FlociContainer {
-	c.envVars[key] = value
-	return c
+// Deprecated: use the same name in package github.com/floci-io/testcontainers-floci-go/flociaws.
+func DefaultDynamoDbConfig() DynamoDbConfig { return flociaws.DefaultDynamoDbConfig() }
+
+// Deprecated: use the same name in package github.com/floci-io/testcontainers-floci-go/flociaws.
+func DefaultEc2Config() Ec2Config { return flociaws.DefaultEc2Config() }
+
+// Deprecated: use the same name in package github.com/floci-io/testcontainers-floci-go/flociaws.
+func DefaultEcrConfig() EcrConfig { return flociaws.DefaultEcrConfig() }
+
+// Deprecated: use the same name in package github.com/floci-io/testcontainers-floci-go/flociaws.
+func DefaultEcsConfig() EcsConfig { return flociaws.DefaultEcsConfig() }
+
+// Deprecated: use the same name in package github.com/floci-io/testcontainers-floci-go/flociaws.
+func DefaultEksConfig() EksConfig { return flociaws.DefaultEksConfig() }
+
+// Deprecated: use the same name in package github.com/floci-io/testcontainers-floci-go/flociaws.
+func DefaultElastiCacheConfig() ElastiCacheConfig { return flociaws.DefaultElastiCacheConfig() }
+
+// Deprecated: use the same name in package github.com/floci-io/testcontainers-floci-go/flociaws.
+func DefaultElbV2Config() ElbV2Config { return flociaws.DefaultElbV2Config() }
+
+// Deprecated: use the same name in package github.com/floci-io/testcontainers-floci-go/flociaws.
+func DefaultEventBridgeConfig() EventBridgeConfig { return flociaws.DefaultEventBridgeConfig() }
+
+// Deprecated: use the same name in package github.com/floci-io/testcontainers-floci-go/flociaws.
+func DefaultFirehoseConfig() FirehoseConfig { return flociaws.DefaultFirehoseConfig() }
+
+// Deprecated: use the same name in package github.com/floci-io/testcontainers-floci-go/flociaws.
+func NewFlociContainer() *FlociContainer { return flociaws.NewFlociContainer() }
+
+// Deprecated: use the same name in package github.com/floci-io/testcontainers-floci-go/flociaws.
+func DefaultGlueConfig() GlueConfig { return flociaws.DefaultGlueConfig() }
+
+// Deprecated: use the same name in package github.com/floci-io/testcontainers-floci-go/flociaws.
+func DefaultIamConfig() IamConfig { return flociaws.DefaultIamConfig() }
+
+// Deprecated: use the same name in package github.com/floci-io/testcontainers-floci-go/flociaws.
+func DefaultKinesisConfig() KinesisConfig { return flociaws.DefaultKinesisConfig() }
+
+// Deprecated: use the same name in package github.com/floci-io/testcontainers-floci-go/flociaws.
+func DefaultKmsConfig() KmsConfig { return flociaws.DefaultKmsConfig() }
+
+// Deprecated: use the same name in package github.com/floci-io/testcontainers-floci-go/flociaws.
+func DefaultLambdaConfig() LambdaConfig { return flociaws.DefaultLambdaConfig() }
+
+// Deprecated: use the same name in package github.com/floci-io/testcontainers-floci-go/flociaws.
+func DefaultMskConfig() MskConfig { return flociaws.DefaultMskConfig() }
+
+// Deprecated: use the same name in package github.com/floci-io/testcontainers-floci-go/flociaws.
+func DefaultOpenSearchConfig() OpenSearchConfig { return flociaws.DefaultOpenSearchConfig() }
+
+// Deprecated: use the same name in package github.com/floci-io/testcontainers-floci-go/flociaws.
+func WithAccountID(accountID string) Option { return flociaws.WithAccountID(accountID) }
+
+// Deprecated: use the same name in package github.com/floci-io/testcontainers-floci-go/flociaws.
+func WithAcmConfig(cfg AcmConfig) Option { return flociaws.WithAcmConfig(cfg) }
+
+// Deprecated: use the same name in package github.com/floci-io/testcontainers-floci-go/flociaws.
+func WithApiGatewayConfig(cfg ApiGatewayConfig) Option { return flociaws.WithApiGatewayConfig(cfg) }
+
+// Deprecated: use the same name in package github.com/floci-io/testcontainers-floci-go/flociaws.
+func WithApiGatewayV2Config(cfg ApiGatewayV2Config) Option {
+	return flociaws.WithApiGatewayV2Config(cfg)
 }
 
-func (c *FlociContainer) withPort(port int) *FlociContainer {
-	c.ports[port] = struct{}{}
-	return c
+// Deprecated: use the same name in package github.com/floci-io/testcontainers-floci-go/flociaws.
+func WithAppConfigConfig(cfg AppConfigConfig) Option { return flociaws.WithAppConfigConfig(cfg) }
+
+// Deprecated: use the same name in package github.com/floci-io/testcontainers-floci-go/flociaws.
+func WithAppConfigDataConfig(cfg AppConfigDataConfig) Option {
+	return flociaws.WithAppConfigDataConfig(cfg)
 }
 
-// WithImage overrides the Docker image used for the container.
-func (c *FlociContainer) WithImage(image string) *FlociContainer {
-	c.image = image
-	return c
+// Deprecated: use the same name in package github.com/floci-io/testcontainers-floci-go/flociaws.
+func WithAthenaConfig(cfg AthenaConfig) Option { return flociaws.WithAthenaConfig(cfg) }
+
+// Deprecated: use the same name in package github.com/floci-io/testcontainers-floci-go/flociaws.
+func WithAvailabilityZone(zone string) Option { return flociaws.WithAvailabilityZone(zone) }
+
+// Deprecated: use the same name in package github.com/floci-io/testcontainers-floci-go/flociaws.
+func WithBedrockRuntimeConfig(cfg BedrockRuntimeConfig) Option {
+	return flociaws.WithBedrockRuntimeConfig(cfg)
 }
 
-// WithRegion sets the default AWS region.
-func (c *FlociContainer) WithRegion(region string) *FlociContainer {
-	return c.withEnv("FLOCI_DEFAULT_REGION", region)
+// Deprecated: use the same name in package github.com/floci-io/testcontainers-floci-go/flociaws.
+func WithCloudFormationConfig(cfg CloudFormationConfig) Option {
+	return flociaws.WithCloudFormationConfig(cfg)
 }
 
-// WithAccountID sets the default AWS account ID.
-func (c *FlociContainer) WithAccountID(accountID string) *FlociContainer {
-	return c.withEnv("FLOCI_DEFAULT_ACCOUNT_ID", accountID)
+// Deprecated: use the same name in package github.com/floci-io/testcontainers-floci-go/flociaws.
+func WithCloudWatchLogsConfig(cfg CloudWatchLogsConfig) Option {
+	return flociaws.WithCloudWatchLogsConfig(cfg)
 }
 
-// WithAvailabilityZone sets the default availability zone.
-func (c *FlociContainer) WithAvailabilityZone(zone string) *FlociContainer {
-	return c.withEnv("FLOCI_DEFAULT_AVAILABILITY_ZONE", zone)
+// Deprecated: use the same name in package github.com/floci-io/testcontainers-floci-go/flociaws.
+func WithCloudWatchMetricsConfig(cfg CloudWatchMetricsConfig) Option {
+	return flociaws.WithCloudWatchMetricsConfig(cfg)
 }
 
-// WithDedicatedNetwork creates a dedicated Docker network for container-based services
-// (Lambda, RDS, ElastiCache, etc.) to communicate with Floci. The network name is
-// generated at Start() time and automatically passed via FLOCI_SERVICES_DOCKER_NETWORK.
-func (c *FlociContainer) WithDedicatedNetwork() *FlociContainer {
-	c.dedicatedNetwork = true
-	return c
+// Deprecated: use the same name in package github.com/floci-io/testcontainers-floci-go/flociaws.
+func WithCodeBuildConfig(cfg CodeBuildConfig) Option { return flociaws.WithCodeBuildConfig(cfg) }
+
+// Deprecated: use the same name in package github.com/floci-io/testcontainers-floci-go/flociaws.
+func WithCodeDeployConfig(cfg CodeDeployConfig) Option { return flociaws.WithCodeDeployConfig(cfg) }
+
+// Deprecated: use the same name in package github.com/floci-io/testcontainers-floci-go/flociaws.
+func WithCognitoConfig(cfg CognitoConfig) Option { return flociaws.WithCognitoConfig(cfg) }
+
+// Deprecated: use the same name in package github.com/floci-io/testcontainers-floci-go/flociaws.
+func WithDedicatedNetwork() Option { return flociaws.WithDedicatedNetwork() }
+
+// Deprecated: use the same name in package github.com/floci-io/testcontainers-floci-go/flociaws.
+func WithDockerSocket(enabled bool) Option { return flociaws.WithDockerSocket(enabled) }
+
+// Deprecated: use the same name in package github.com/floci-io/testcontainers-floci-go/flociaws.
+func WithDynamoDbConfig(cfg DynamoDbConfig) Option { return flociaws.WithDynamoDbConfig(cfg) }
+
+// Deprecated: use the same name in package github.com/floci-io/testcontainers-floci-go/flociaws.
+func WithEc2Config(cfg Ec2Config) Option { return flociaws.WithEc2Config(cfg) }
+
+// Deprecated: use the same name in package github.com/floci-io/testcontainers-floci-go/flociaws.
+func WithEcrConfig(cfg EcrConfig) Option { return flociaws.WithEcrConfig(cfg) }
+
+// Deprecated: use the same name in package github.com/floci-io/testcontainers-floci-go/flociaws.
+func WithEcsConfig(cfg EcsConfig) Option { return flociaws.WithEcsConfig(cfg) }
+
+// Deprecated: use the same name in package github.com/floci-io/testcontainers-floci-go/flociaws.
+func WithEksConfig(cfg EksConfig) Option { return flociaws.WithEksConfig(cfg) }
+
+// Deprecated: use the same name in package github.com/floci-io/testcontainers-floci-go/flociaws.
+func WithElastiCacheConfig(cfg ElastiCacheConfig) Option { return flociaws.WithElastiCacheConfig(cfg) }
+
+// Deprecated: use the same name in package github.com/floci-io/testcontainers-floci-go/flociaws.
+func WithElbV2Config(cfg ElbV2Config) Option { return flociaws.WithElbV2Config(cfg) }
+
+// Deprecated: use the same name in package github.com/floci-io/testcontainers-floci-go/flociaws.
+func WithEventBridgeConfig(cfg EventBridgeConfig) Option { return flociaws.WithEventBridgeConfig(cfg) }
+
+// Deprecated: use the same name in package github.com/floci-io/testcontainers-floci-go/flociaws.
+func WithFirehoseConfig(cfg FirehoseConfig) Option { return flociaws.WithFirehoseConfig(cfg) }
+
+// Deprecated: use the same name in package github.com/floci-io/testcontainers-floci-go/flociaws.
+func WithGlueConfig(cfg GlueConfig) Option { return flociaws.WithGlueConfig(cfg) }
+
+// Deprecated: use the same name in package github.com/floci-io/testcontainers-floci-go/flociaws.
+func WithIamConfig(cfg IamConfig) Option { return flociaws.WithIamConfig(cfg) }
+
+// Deprecated: use the same name in package github.com/floci-io/testcontainers-floci-go/flociaws.
+func WithKinesisConfig(cfg KinesisConfig) Option { return flociaws.WithKinesisConfig(cfg) }
+
+// Deprecated: use the same name in package github.com/floci-io/testcontainers-floci-go/flociaws.
+func WithKmsConfig(cfg KmsConfig) Option { return flociaws.WithKmsConfig(cfg) }
+
+// Deprecated: use the same name in package github.com/floci-io/testcontainers-floci-go/flociaws.
+func WithLambdaConfig(cfg LambdaConfig) Option { return flociaws.WithLambdaConfig(cfg) }
+
+// Deprecated: use the same name in package github.com/floci-io/testcontainers-floci-go/flociaws.
+func WithMskConfig(cfg MskConfig) Option { return flociaws.WithMskConfig(cfg) }
+
+// Deprecated: use the same name in package github.com/floci-io/testcontainers-floci-go/flociaws.
+func WithOpenSearchConfig(cfg OpenSearchConfig) Option { return flociaws.WithOpenSearchConfig(cfg) }
+
+// Deprecated: use the same name in package github.com/floci-io/testcontainers-floci-go/flociaws.
+func WithPipesConfig(cfg PipesConfig) Option { return flociaws.WithPipesConfig(cfg) }
+
+// Deprecated: use the same name in package github.com/floci-io/testcontainers-floci-go/flociaws.
+func WithRdsConfig(cfg RdsConfig) Option { return flociaws.WithRdsConfig(cfg) }
+
+// Deprecated: use the same name in package github.com/floci-io/testcontainers-floci-go/flociaws.
+func WithRegion(region string) Option { return flociaws.WithRegion(region) }
+
+// Deprecated: use the same name in package github.com/floci-io/testcontainers-floci-go/flociaws.
+func WithResourceGroupsTaggingConfig(cfg ResourceGroupsTaggingConfig) Option {
+	return flociaws.WithResourceGroupsTaggingConfig(cfg)
 }
 
-// WithDockerSocket overrides whether the host Docker socket is mounted. By default it
-// is mounted only while an enabled service spawns sibling containers (Lambda, RDS,
-// ElastiCache, ECS, EC2, EKS, ECR, MSK, OpenSearch, Athena, CodeBuild); pass false on
-// hosts where the socket cannot be mounted, true to always mount it.
-func (c *FlociContainer) WithDockerSocket(enabled bool) *FlociContainer {
-	c.dockerSocketOverride = &enabled
-	return c
+// Deprecated: use the same name in package github.com/floci-io/testcontainers-floci-go/flociaws.
+func WithS3Config(cfg S3Config) Option { return flociaws.WithS3Config(cfg) }
+
+// Deprecated: use the same name in package github.com/floci-io/testcontainers-floci-go/flociaws.
+func WithSchedulerConfig(cfg SchedulerConfig) Option { return flociaws.WithSchedulerConfig(cfg) }
+
+// Deprecated: use the same name in package github.com/floci-io/testcontainers-floci-go/flociaws.
+func WithSecretsManagerConfig(cfg SecretsManagerConfig) Option {
+	return flociaws.WithSecretsManagerConfig(cfg)
 }
 
-// WithAcmConfig applies ACM service configuration.
-func (c *FlociContainer) WithAcmConfig(cfg AcmConfig) *FlociContainer {
-	c.acmConfig = cfg
-	cfg.applyEnvVars(c)
-	return c
+// Deprecated: use the same name in package github.com/floci-io/testcontainers-floci-go/flociaws.
+func WithSesConfig(cfg SesConfig) Option { return flociaws.WithSesConfig(cfg) }
+
+// Deprecated: use the same name in package github.com/floci-io/testcontainers-floci-go/flociaws.
+func WithSesV2Config(cfg SesV2Config) Option { return flociaws.WithSesV2Config(cfg) }
+
+// Deprecated: use the same name in package github.com/floci-io/testcontainers-floci-go/flociaws.
+func WithSnsConfig(cfg SnsConfig) Option { return flociaws.WithSnsConfig(cfg) }
+
+// Deprecated: use the same name in package github.com/floci-io/testcontainers-floci-go/flociaws.
+func WithSqsConfig(cfg SqsConfig) Option { return flociaws.WithSqsConfig(cfg) }
+
+// Deprecated: use the same name in package github.com/floci-io/testcontainers-floci-go/flociaws.
+func WithSsmConfig(cfg SsmConfig) Option { return flociaws.WithSsmConfig(cfg) }
+
+// Deprecated: use the same name in package github.com/floci-io/testcontainers-floci-go/flociaws.
+func WithStepFunctionsConfig(cfg StepFunctionsConfig) Option {
+	return flociaws.WithStepFunctionsConfig(cfg)
 }
 
-// WithApiGatewayConfig applies API Gateway service configuration.
-func (c *FlociContainer) WithApiGatewayConfig(cfg ApiGatewayConfig) *FlociContainer {
-	c.apiGatewayConfig = cfg
-	cfg.applyEnvVars(c)
-	return c
+// Deprecated: use the same name in package github.com/floci-io/testcontainers-floci-go/flociaws.
+func DefaultPipesConfig() PipesConfig { return flociaws.DefaultPipesConfig() }
+
+// Deprecated: use the same name in package github.com/floci-io/testcontainers-floci-go/flociaws.
+func DefaultRdsConfig() RdsConfig { return flociaws.DefaultRdsConfig() }
+
+// Deprecated: use the same name in package github.com/floci-io/testcontainers-floci-go/flociaws.
+func DefaultResourceGroupsTaggingConfig() ResourceGroupsTaggingConfig {
+	return flociaws.DefaultResourceGroupsTaggingConfig()
 }
 
-// WithApiGatewayV2Config applies API Gateway V2 service configuration.
-func (c *FlociContainer) WithApiGatewayV2Config(cfg ApiGatewayV2Config) *FlociContainer {
-	c.apiGatewayV2Config = cfg
-	cfg.applyEnvVars(c)
-	return c
+// Deprecated: use the same name in package github.com/floci-io/testcontainers-floci-go/flociaws.
+func DefaultS3Config() S3Config { return flociaws.DefaultS3Config() }
+
+// Deprecated: use the same name in package github.com/floci-io/testcontainers-floci-go/flociaws.
+func DefaultSchedulerConfig() SchedulerConfig { return flociaws.DefaultSchedulerConfig() }
+
+// Deprecated: use the same name in package github.com/floci-io/testcontainers-floci-go/flociaws.
+func DefaultSecretsManagerConfig() SecretsManagerConfig {
+	return flociaws.DefaultSecretsManagerConfig()
 }
 
-// WithAppConfigConfig applies AppConfig service configuration.
-func (c *FlociContainer) WithAppConfigConfig(cfg AppConfigConfig) *FlociContainer {
-	c.appConfigConfig = cfg
-	cfg.applyEnvVars(c)
-	return c
-}
+// Deprecated: use the same name in package github.com/floci-io/testcontainers-floci-go/flociaws.
+func DefaultSesConfig() SesConfig { return flociaws.DefaultSesConfig() }
 
-// WithAppConfigDataConfig applies AppConfig Data service configuration.
-func (c *FlociContainer) WithAppConfigDataConfig(cfg AppConfigDataConfig) *FlociContainer {
-	c.appConfigDataConfig = cfg
-	cfg.applyEnvVars(c)
-	return c
-}
+// Deprecated: use the same name in package github.com/floci-io/testcontainers-floci-go/flociaws.
+func DefaultSesV2Config() SesV2Config { return flociaws.DefaultSesV2Config() }
 
-// WithAthenaConfig applies Athena service configuration.
-func (c *FlociContainer) WithAthenaConfig(cfg AthenaConfig) *FlociContainer {
-	c.athenaConfig = cfg
-	cfg.applyEnvVars(c)
-	return c
-}
+// Deprecated: use the same name in package github.com/floci-io/testcontainers-floci-go/flociaws.
+func DefaultSnsConfig() SnsConfig { return flociaws.DefaultSnsConfig() }
 
-// WithBedrockRuntimeConfig applies Bedrock Runtime service configuration.
-func (c *FlociContainer) WithBedrockRuntimeConfig(cfg BedrockRuntimeConfig) *FlociContainer {
-	c.bedrockRuntimeConfig = cfg
-	cfg.applyEnvVars(c)
-	return c
-}
+// Deprecated: use the same name in package github.com/floci-io/testcontainers-floci-go/flociaws.
+func DefaultSqsConfig() SqsConfig { return flociaws.DefaultSqsConfig() }
 
-// WithCloudFormationConfig applies CloudFormation service configuration.
-func (c *FlociContainer) WithCloudFormationConfig(cfg CloudFormationConfig) *FlociContainer {
-	c.cloudFormationConfig = cfg
-	cfg.applyEnvVars(c)
-	return c
-}
+// Deprecated: use the same name in package github.com/floci-io/testcontainers-floci-go/flociaws.
+func DefaultSsmConfig() SsmConfig { return flociaws.DefaultSsmConfig() }
 
-// WithCloudWatchLogsConfig applies CloudWatch Logs service configuration.
-func (c *FlociContainer) WithCloudWatchLogsConfig(cfg CloudWatchLogsConfig) *FlociContainer {
-	c.cloudWatchLogsConfig = cfg
-	cfg.applyEnvVars(c)
-	return c
-}
-
-// WithCloudWatchMetricsConfig applies CloudWatch Metrics service configuration.
-func (c *FlociContainer) WithCloudWatchMetricsConfig(cfg CloudWatchMetricsConfig) *FlociContainer {
-	c.cloudWatchMetricsConfig = cfg
-	cfg.applyEnvVars(c)
-	return c
-}
-
-// WithCodeBuildConfig applies CodeBuild service configuration.
-func (c *FlociContainer) WithCodeBuildConfig(cfg CodeBuildConfig) *FlociContainer {
-	c.codeBuildConfig = cfg
-	cfg.applyEnvVars(c)
-	return c
-}
-
-// WithCodeDeployConfig applies CodeDeploy service configuration.
-func (c *FlociContainer) WithCodeDeployConfig(cfg CodeDeployConfig) *FlociContainer {
-	c.codeDeployConfig = cfg
-	cfg.applyEnvVars(c)
-	return c
-}
-
-// WithCognitoConfig applies Cognito service configuration.
-func (c *FlociContainer) WithCognitoConfig(cfg CognitoConfig) *FlociContainer {
-	c.cognitoConfig = cfg
-	cfg.applyEnvVars(c)
-	return c
-}
-
-// WithDynamoDbConfig applies DynamoDB service configuration.
-func (c *FlociContainer) WithDynamoDbConfig(cfg DynamoDbConfig) *FlociContainer {
-	c.dynamoDbConfig = cfg
-	cfg.applyEnvVars(c)
-	return c
-}
-
-// WithEc2Config applies EC2 service configuration.
-func (c *FlociContainer) WithEc2Config(cfg Ec2Config) *FlociContainer {
-	c.ec2Config = cfg
-	cfg.applyEnvVars(c)
-	return c
-}
-
-// WithEcrConfig applies ECR service configuration.
-func (c *FlociContainer) WithEcrConfig(cfg EcrConfig) *FlociContainer {
-	c.ecrConfig = cfg
-	cfg.applyEnvVars(c)
-	c.refreshExposedPorts()
-	return c
-}
-
-// WithEcsConfig applies ECS service configuration.
-func (c *FlociContainer) WithEcsConfig(cfg EcsConfig) *FlociContainer {
-	c.ecsConfig = cfg
-	cfg.applyEnvVars(c)
-	return c
-}
-
-// WithEksConfig applies EKS service configuration.
-func (c *FlociContainer) WithEksConfig(cfg EksConfig) *FlociContainer {
-	c.eksConfig = cfg
-	cfg.applyEnvVars(c)
-	c.refreshExposedPorts()
-	return c
-}
-
-// WithElastiCacheConfig applies ElastiCache service configuration.
-func (c *FlociContainer) WithElastiCacheConfig(cfg ElastiCacheConfig) *FlociContainer {
-	c.elastiCacheConfig = cfg
-	cfg.applyEnvVars(c)
-	c.refreshExposedPorts()
-	return c
-}
-
-// WithElbV2Config applies ELBv2 service configuration.
-func (c *FlociContainer) WithElbV2Config(cfg ElbV2Config) *FlociContainer {
-	c.elbV2Config = cfg
-	cfg.applyEnvVars(c)
-	return c
-}
-
-// WithEventBridgeConfig applies EventBridge service configuration.
-func (c *FlociContainer) WithEventBridgeConfig(cfg EventBridgeConfig) *FlociContainer {
-	c.eventBridgeConfig = cfg
-	cfg.applyEnvVars(c)
-	return c
-}
-
-// WithFirehoseConfig applies Firehose service configuration.
-func (c *FlociContainer) WithFirehoseConfig(cfg FirehoseConfig) *FlociContainer {
-	c.firehoseConfig = cfg
-	cfg.applyEnvVars(c)
-	return c
-}
-
-// WithGlueConfig applies Glue service configuration.
-func (c *FlociContainer) WithGlueConfig(cfg GlueConfig) *FlociContainer {
-	c.glueConfig = cfg
-	cfg.applyEnvVars(c)
-	return c
-}
-
-// WithIamConfig applies IAM service configuration.
-func (c *FlociContainer) WithIamConfig(cfg IamConfig) *FlociContainer {
-	c.iamConfig = cfg
-	cfg.applyEnvVars(c)
-	return c
-}
-
-// WithKinesisConfig applies Kinesis service configuration.
-func (c *FlociContainer) WithKinesisConfig(cfg KinesisConfig) *FlociContainer {
-	c.kinesisConfig = cfg
-	cfg.applyEnvVars(c)
-	return c
-}
-
-// WithKmsConfig applies KMS service configuration.
-func (c *FlociContainer) WithKmsConfig(cfg KmsConfig) *FlociContainer {
-	c.kmsConfig = cfg
-	cfg.applyEnvVars(c)
-	return c
-}
-
-// WithLambdaConfig applies Lambda service configuration.
-func (c *FlociContainer) WithLambdaConfig(cfg LambdaConfig) *FlociContainer {
-	c.lambdaConfig = cfg
-	cfg.applyEnvVars(c)
-	c.refreshExposedPorts()
-	return c
-}
-
-// WithMskConfig applies MSK service configuration.
-func (c *FlociContainer) WithMskConfig(cfg MskConfig) *FlociContainer {
-	c.mskConfig = cfg
-	cfg.applyEnvVars(c)
-	return c
-}
-
-// WithOpenSearchConfig applies OpenSearch service configuration.
-func (c *FlociContainer) WithOpenSearchConfig(cfg OpenSearchConfig) *FlociContainer {
-	c.openSearchConfig = cfg
-	cfg.applyEnvVars(c)
-	c.refreshExposedPorts()
-	return c
-}
-
-// WithPipesConfig applies Pipes service configuration.
-func (c *FlociContainer) WithPipesConfig(cfg PipesConfig) *FlociContainer {
-	c.pipesConfig = cfg
-	cfg.applyEnvVars(c)
-	return c
-}
-
-// WithRdsConfig applies RDS service configuration.
-func (c *FlociContainer) WithRdsConfig(cfg RdsConfig) *FlociContainer {
-	c.rdsConfig = cfg
-	cfg.applyEnvVars(c)
-	c.refreshExposedPorts()
-	return c
-}
-
-// WithResourceGroupsTaggingConfig applies Resource Groups Tagging service configuration.
-func (c *FlociContainer) WithResourceGroupsTaggingConfig(cfg ResourceGroupsTaggingConfig) *FlociContainer {
-	c.resourceGroupsTaggingConfig = cfg
-	cfg.applyEnvVars(c)
-	return c
-}
-
-// WithS3Config applies S3 service configuration.
-func (c *FlociContainer) WithS3Config(cfg S3Config) *FlociContainer {
-	c.s3Config = cfg
-	cfg.applyEnvVars(c)
-	return c
-}
-
-// WithSchedulerConfig applies Scheduler service configuration.
-func (c *FlociContainer) WithSchedulerConfig(cfg SchedulerConfig) *FlociContainer {
-	c.schedulerConfig = cfg
-	cfg.applyEnvVars(c)
-	return c
-}
-
-// WithSecretsManagerConfig applies Secrets Manager service configuration.
-func (c *FlociContainer) WithSecretsManagerConfig(cfg SecretsManagerConfig) *FlociContainer {
-	c.secretsManagerConfig = cfg
-	cfg.applyEnvVars(c)
-	return c
-}
-
-// WithSesConfig applies SES service configuration.
-func (c *FlociContainer) WithSesConfig(cfg SesConfig) *FlociContainer {
-	c.sesConfig = cfg
-	cfg.applyEnvVars(c)
-	return c
-}
-
-// WithSesV2Config applies SES V2 service configuration.
-func (c *FlociContainer) WithSesV2Config(cfg SesV2Config) *FlociContainer {
-	c.sesV2Config = cfg
-	cfg.applyEnvVars(c)
-	return c
-}
-
-// WithSnsConfig applies SNS service configuration.
-func (c *FlociContainer) WithSnsConfig(cfg SnsConfig) *FlociContainer {
-	c.snsConfig = cfg
-	cfg.applyEnvVars(c)
-	return c
-}
-
-// WithSqsConfig applies SQS service configuration.
-func (c *FlociContainer) WithSqsConfig(cfg SqsConfig) *FlociContainer {
-	c.sqsConfig = cfg
-	cfg.applyEnvVars(c)
-	return c
-}
-
-// WithSsmConfig applies SSM service configuration.
-func (c *FlociContainer) WithSsmConfig(cfg SsmConfig) *FlociContainer {
-	c.ssmConfig = cfg
-	cfg.applyEnvVars(c)
-	return c
-}
-
-// WithStepFunctionsConfig applies Step Functions service configuration.
-func (c *FlociContainer) WithStepFunctionsConfig(cfg StepFunctionsConfig) *FlociContainer {
-	c.stepFunctionsConfig = cfg
-	cfg.applyEnvVars(c)
-	return c
-}
-
-// Start launches the Floci container and waits for it to be ready.
-//
-// Deprecated: use Run.
-func (c *FlociContainer) Start(ctx context.Context) (*StartedFlociContainer, error) {
-	return c.run(ctx)
-}
-
-// needsDockerSocket reports whether the host Docker socket should be mounted for the
-// given final container environment: an explicit WithDockerSocket override wins,
-// otherwise any enabled service that spawns sibling containers requires it.
-func (c *FlociContainer) needsDockerSocket(env map[string]string) bool {
-	if c.dockerSocketOverride != nil {
-		return *c.dockerSocketOverride
-	}
-	return dockerSocketRequired(env)
-}
-
-func (c *FlociContainer) run(ctx context.Context, customizers ...testcontainers.ContainerCustomizer) (*Container, error) {
-	var dockerNetwork *testcontainers.DockerNetwork
-	if c.dedicatedNetwork {
-		var err error
-		dockerNetwork, err = tcnetwork.New(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("creating dedicated network: %w", err)
-		}
-		c.withEnv("FLOCI_SERVICES_DOCKER_NETWORK", dockerNetwork.Name)
-	}
-
-	opts, finalEnv := c.requestOptions(dockerNetwork, customizers)
-	ctr, err := testcontainers.Run(ctx, c.image, opts...)
-
-	var fc *Container
-	if ctr != nil {
-		fc = &Container{
-			Container:            ctr,
-			network:              dockerNetwork,
-			region:               envOr(*finalEnv, "FLOCI_DEFAULT_REGION", DefaultRegion),
-			availabilityZone:     envOr(*finalEnv, "FLOCI_DEFAULT_AVAILABILITY_ZONE", DefaultAvailabilityZone),
-			accountID:            envOr(*finalEnv, "FLOCI_DEFAULT_ACCOUNT_ID", DefaultAccountID),
-			dedicatedNetworkName: networkName(dockerNetwork),
-		}
-	} else if dockerNetwork != nil {
-		// No container owns the network yet, so nothing else would remove it.
-		_ = dockerNetwork.Remove(ctx)
-	}
-	if err != nil {
-		return fc, fmt.Errorf("run floci: %w", err)
-	}
-
-	endpoint, err := ctr.PortEndpoint(ctx, fmt.Sprintf("%d/tcp", flociPort), "http")
-	if err != nil {
-		return fc, fmt.Errorf("getting floci endpoint: %w", err)
-	}
-	fc.endpoint = endpoint
-	return fc, nil
-}
-
-// requestOptions returns the customizers for testcontainers.Run: the module defaults,
-// then the caller's customizers, then a final step that sees the fully customized
-// request. That last step records the final environment (for the identity getters) and
-// decides the Docker socket mount from it, so generic options such as
-// testcontainers.WithEnv cannot leave either out of sync with what the emulator runs.
-func (c *FlociContainer) requestOptions(dockerNetwork *testcontainers.DockerNetwork, customizers []testcontainers.ContainerCustomizer) ([]testcontainers.ContainerCustomizer, *map[string]string) {
-	exposedPorts := make([]string, 0, len(c.ports))
-	for port := range c.ports {
-		exposedPorts = append(exposedPorts, fmt.Sprintf("%d/tcp", port))
-	}
-
-	opts := []testcontainers.ContainerCustomizer{
-		testcontainers.WithExposedPorts(exposedPorts...),
-		testcontainers.WithEnv(maps.Clone(c.envVars)),
-		testcontainers.WithWaitStrategy(wait.ForHTTP("/_floci/health").
-			WithPort(fmt.Sprintf("%d/tcp", flociPort)).
-			WithStatusCodeMatcher(func(status int) bool { return status == http.StatusOK }).
-			WithStartupTimeout(startupTimeout)),
-	}
-	if dockerNetwork != nil {
-		opts = append(opts, tcnetwork.WithNetwork(nil, dockerNetwork))
-	}
-	opts = append(opts, customizers...)
-
-	finalEnv := map[string]string{}
-	opts = append(opts, testcontainers.CustomizeRequestOption(func(req *testcontainers.GenericContainerRequest) error {
-		finalEnv = maps.Clone(req.Env)
-		if c.needsDockerSocket(req.Env) {
-			// Chain rather than replace, so a caller's WithHostConfigModifier still runs.
-			prev := req.HostConfigModifier
-			req.HostConfigModifier = func(hc *dockercontainer.HostConfig) {
-				if prev != nil {
-					prev(hc)
-				}
-				hc.Binds = append(hc.Binds, dockerSocket+":"+dockerSocket)
-			}
-		}
-		return nil
-	}))
-	return opts, &finalEnv
-}
-
-func envOr(env map[string]string, key, fallback string) string {
-	if v := env[key]; v != "" {
-		return v
-	}
-	return fallback
-}
-
-func networkName(nw *testcontainers.DockerNetwork) string {
-	if nw == nil {
-		return ""
-	}
-	return nw.Name
-}
-
-func (c *FlociContainer) applyAllConfigs() {
-	c.acmConfig.applyEnvVars(c)
-	c.apiGatewayConfig.applyEnvVars(c)
-	c.apiGatewayV2Config.applyEnvVars(c)
-	c.appConfigConfig.applyEnvVars(c)
-	c.appConfigDataConfig.applyEnvVars(c)
-	c.athenaConfig.applyEnvVars(c)
-	c.bedrockRuntimeConfig.applyEnvVars(c)
-	c.cloudFormationConfig.applyEnvVars(c)
-	c.cloudWatchLogsConfig.applyEnvVars(c)
-	c.cloudWatchMetricsConfig.applyEnvVars(c)
-	c.codeBuildConfig.applyEnvVars(c)
-	c.codeDeployConfig.applyEnvVars(c)
-	c.cognitoConfig.applyEnvVars(c)
-	c.dynamoDbConfig.applyEnvVars(c)
-	c.ec2Config.applyEnvVars(c)
-	c.ecrConfig.applyEnvVars(c)
-	c.ecsConfig.applyEnvVars(c)
-	c.eksConfig.applyEnvVars(c)
-	c.elastiCacheConfig.applyEnvVars(c)
-	c.elbV2Config.applyEnvVars(c)
-	c.eventBridgeConfig.applyEnvVars(c)
-	c.firehoseConfig.applyEnvVars(c)
-	c.glueConfig.applyEnvVars(c)
-	c.iamConfig.applyEnvVars(c)
-	c.kinesisConfig.applyEnvVars(c)
-	c.kmsConfig.applyEnvVars(c)
-	c.lambdaConfig.applyEnvVars(c)
-	c.mskConfig.applyEnvVars(c)
-	c.openSearchConfig.applyEnvVars(c)
-	c.pipesConfig.applyEnvVars(c)
-	c.rdsConfig.applyEnvVars(c)
-	c.resourceGroupsTaggingConfig.applyEnvVars(c)
-	c.s3Config.applyEnvVars(c)
-	c.schedulerConfig.applyEnvVars(c)
-	c.secretsManagerConfig.applyEnvVars(c)
-	c.sesConfig.applyEnvVars(c)
-	c.sesV2Config.applyEnvVars(c)
-	c.snsConfig.applyEnvVars(c)
-	c.sqsConfig.applyEnvVars(c)
-	c.ssmConfig.applyEnvVars(c)
-	c.stepFunctionsConfig.applyEnvVars(c)
-	c.refreshExposedPorts()
-}
-
-func (c *FlociContainer) refreshExposedPorts() {
-	// Rebuild from scratch so re-applying a config with an Expose flag turned
-	// off also removes the ports it previously added.
-	c.ports = map[int]struct{}{flociPort: {}}
-	c.ecrConfig.applyExposedPorts(c)
-	c.eksConfig.applyExposedPorts(c)
-	c.elastiCacheConfig.applyExposedPorts(c)
-	c.lambdaConfig.applyExposedPorts(c)
-	c.openSearchConfig.applyExposedPorts(c)
-	c.rdsConfig.applyExposedPorts(c)
-}
-
-// Container is a running Floci container. It embeds testcontainers.Container, so
-// Logs, Exec, Host, MappedPort and testcontainers.CleanupContainer all work on it.
-type Container struct {
-	testcontainers.Container
-	network              *testcontainers.DockerNetwork
-	endpoint             string
-	region               string
-	availabilityZone     string
-	accountID            string
-	dedicatedNetworkName string
-}
-
-// Container must stay a drop-in testcontainers.Container (CleanupContainer, Logs, Exec).
-var _ testcontainers.Container = (*Container)(nil)
-
-// StartedFlociContainer is the type returned by the deprecated Start.
-//
-// Deprecated: use Container.
-type StartedFlociContainer = Container
-
-// GetEndpoint returns the HTTP endpoint for Floci (e.g. "http://localhost:32768").
-func (s *Container) GetEndpoint() string { return s.endpoint }
-
-// GetRegion returns the configured AWS region.
-func (s *Container) GetRegion() string { return s.region }
-
-// GetAccessKey returns the AWS access key (always "test").
-func (s *Container) GetAccessKey() string { return DefaultAccessKey }
-
-// GetSecretKey returns the AWS secret key (always "test").
-func (s *Container) GetSecretKey() string { return DefaultSecretKey }
-
-// GetAccountID returns the configured AWS account ID.
-func (s *Container) GetAccountID() string { return s.accountID }
-
-// GetAvailabilityZone returns the configured availability zone.
-func (s *Container) GetAvailabilityZone() string { return s.availabilityZone }
-
-// GetDedicatedNetworkName returns the dedicated Docker network name, or empty string if none.
-func (s *Container) GetDedicatedNetworkName() string { return s.dedicatedNetworkName }
-
-// GetMappedPort returns the host-mapped port for a given container port.
-func (s *Container) GetMappedPort(ctx context.Context, port int) (int, error) {
-	mapped, err := s.MappedPort(ctx, fmt.Sprintf("%d/tcp", port))
-	if err != nil {
-		return 0, err
-	}
-	p, err := strconv.Atoi(mapped.Port())
-	if err != nil {
-		return 0, err
-	}
-	return p, nil
-}
-
-// Terminate stops and removes the container, then removes the dedicated network
-// created by WithDedicatedNetwork, if any.
-func (s *Container) Terminate(ctx context.Context, opts ...testcontainers.TerminateOption) error {
-	err := s.Container.Terminate(ctx, opts...)
-	if s.network != nil {
-		if nerr := s.network.Remove(ctx); nerr != nil {
-			err = errors.Join(err, fmt.Errorf("removing network: %w", nerr))
-		}
-	}
-	return err
-}
+// Deprecated: use the same name in package github.com/floci-io/testcontainers-floci-go/flociaws.
+func DefaultStepFunctionsConfig() StepFunctionsConfig { return flociaws.DefaultStepFunctionsConfig() }

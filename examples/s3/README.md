@@ -19,7 +19,7 @@ go test -v -timeout 300s ./examples/s3/...
 
 ```go
 // Start Floci
-fc, err := floci.Run(ctx, "floci/floci:latest")
+fc, err := flociaws.Run(ctx, "floci/floci:latest")
 testcontainers.CleanupContainer(t, fc)
 
 // Wire up the AWS SDK S3 client

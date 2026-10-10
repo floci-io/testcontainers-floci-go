@@ -139,17 +139,23 @@ wip: still working on this       # "wip" is not a recognised type
 Port from the Java reference module (`testcontainers-floci`): read its `<Service>Config.java` and
 `<Service>ConfigTest` and match the env-var keys and defaults exactly.
 
-1. In `services.go`, add a `<Service>Config` struct, a `Default<Service>Config()` constructor and its
-   `applyEnvVars` method (and `applyExposedPorts` if the service publishes ports).
-2. In `floci.go`, add the field to `FlociContainer`, set its default in `newBuilder()`, add the
+The module is laid out as a shared core plus one package per cloud: `internal/core` (the cloud
+descriptor, request building, Docker socket detection, the started container with `Reset` and
+`Terminate`) and `flociaws` (AWS). The root package `floci` only holds deprecated aliases of `flociaws`;
+never add code there, but do add an alias there for every new exported name in `flociaws`.
+
+1. In `flociaws/services.go`, add a `<Service>Config` struct, a `Default<Service>Config()` constructor
+   and its `applyEnvVars` method (and `applyExposedPorts` if the service publishes ports).
+2. In `flociaws/floci.go`, add the field to `FlociContainer`, set its default in `newBuilder()`, add the
    `With<Service>Config` builder method, and call it from `applyAllConfigs` (and `refreshExposedPorts`).
-3. In `options.go`, add the package-level `With<Service>Config` option that wraps the builder method, so
-   it can be passed to `Run`.
-4. If the service spawns sibling containers, add it to `dockerSocketServices` in `services.go` (mark it
-   `mockable` if the Java config's `requiresDockerSocket()` checks `!mock`), with a case in
-   `socket_internal_test.go`.
-5. Add an example under `examples/<service>/` and integration coverage in `floci_test.go`, using
-   `floci.Run` and `testcontainers.CleanupContainer`.
+3. In `flociaws/options.go`, add the package-level `With<Service>Config` option that wraps the builder
+   method, so it can be passed to `Run`.
+4. If the service spawns sibling containers, add it to `SocketServices` in the `awsDescriptor`
+   (`flociaws/floci.go`; `Mockable: true` if the Java config's `requiresDockerSocket()` checks `!mock`),
+   with a case in `flociaws/socket_internal_test.go`.
+5. Add the deprecated aliases (type, `Default…Config`, `With…Config`) to the root `floci.go`.
+6. Add an example under `examples/<service>/` and integration coverage in `flociaws/floci_test.go`,
+   using `flociaws.Run` and `testcontainers.CleanupContainer`.
 
 ## Pull Request Guidelines
 
