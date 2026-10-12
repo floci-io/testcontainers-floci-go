@@ -75,7 +75,7 @@ jobs:
       (needs.release-please.result == 'success' && needs.release-please.outputs.release-created == 'true'))
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      contents: read
       security-events: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -111,8 +111,3 @@ jobs:
         with:
           sarif_file: trivy-results.sarif
           category: trivy
-
-      - name: Submit Dependency Snapshot
-        uses: actions/go-dependency-submission@f35d5c9af13ce9cc32f7930b171e315e878f6921 # v2.0.3
-        with:
-          go-mod-path: go.mod
