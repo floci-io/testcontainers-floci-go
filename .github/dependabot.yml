@@ -1,0 +1,35 @@
+version: 2
+updates:
+  # Titles must be Conventional Commits: the pull-request title is checked by commit lint and becomes
+  # the squash commit, which release-please reads.
+  - package-ecosystem: gomod
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 10
+    labels:
+      - dependencies
+    # go.mod mixes the module's own dependencies with test-only ones (the AWS SDK clients), so every
+    # update is a chore. Retitle a runtime bump (e.g. testcontainers-go) to fix(deps) before merging
+    # so it reaches the changelog and cuts a release.
+    commit-message:
+      prefix: "chore(deps)"
+    groups:
+      aws-sdk:
+        patterns:
+          - "github.com/aws/*"
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+      - github-actions
+    commit-message:
+      prefix: "chore(deps)"
+    groups:
+      codeql:
+        patterns:
+          - "github/codeql-action*"
