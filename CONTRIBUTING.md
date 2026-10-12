@@ -197,7 +197,7 @@ Releases follow the same release-please flow as the Java module (`.github/workfl
    `CHANGELOG.md` entry. Commit messages are linted in CI (`commit-lint`), because they become the changelog.
 2. To release, review and merge the release PR. release-please then tags `vX.Y.Z` and creates the GitHub
    release, and the same workflow confirms the version on the Go module proxy and runs the security scans
-   (CodeQL, Trivy, dependency snapshot) against the tag.
+   (CodeQL, Trivy) against the tag.
 3. To recover a release (for example a failed proxy check), run **Release Please** manually with the `tag`
    input set to the existing tag.
 
