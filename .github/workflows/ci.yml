@@ -11,7 +11,7 @@ jobs:
     name: Build & vet
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: actions/setup-go@v5
         with:
@@ -34,7 +34,7 @@ jobs:
         # v0.42.0+ only: the moby/moby migration in v0.42.0 breaks compilation against older releases
         tc-version: ["v0.42.0", "v0.43.0", "v0.44.0"]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: actions/setup-go@v5
         with:
