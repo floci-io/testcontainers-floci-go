@@ -28,9 +28,10 @@
 ## What is this?
 
 A [Testcontainers for Go](https://golang.testcontainers.org) module for [Floci](https://github.com/floci-io), the free,
-open-source local cloud emulators. The `floci` package starts a Floci (AWS) container for your integration tests and
+open-source local cloud emulators. The `flociaws` package starts a Floci (AWS) container for your integration tests and
 gives you an endpoint and credentials to point the AWS SDK for Go v2 at, plus typed, per-service configuration structs
-over the emulator's environment variables. No cloud account, no auth token.
+over the emulator's environment variables. The `flociaz` package does the same for Floci Azure, with connection
+helpers for the Azure SDK for Go. No cloud account, no auth token.
 
 See the [Floci documentation](https://floci.io/floci/services/) for the full list of supported AWS services.
 
@@ -42,7 +43,7 @@ named after [floccus](https://en.wikipedia.org/wiki/Cirrocumulus_floccus), the c
 | Emulator                                           | Cloud | Port | Supported                                                                                  |
 |----------------------------------------------------|-------|:----:|:------------------------------------------------------------------------------------------:|
 | [floci](https://github.com/floci-io/floci)         | AWS   | 4566 | ✅ [`floci` package](https://pkg.go.dev/github.com/floci-io/testcontainers-floci-go)        |
-| [floci-az](https://github.com/floci-io/floci-az)   | Azure | 4577 | Planned                                                                                    |
+| [floci-az](https://github.com/floci-io/floci-az)   | Azure | 4577 | ✅ [`flociaz` package](https://pkg.go.dev/github.com/floci-io/testcontainers-floci-go/flociaz) |
 | [floci-gcp](https://github.com/floci-io/floci-gcp) | GCP   | 4588 | Planned                                                                                    |
 | [floci-oci](https://github.com/floci-io/floci-oci) | OCI   | 4599 | Planned                                                                                    |
 
@@ -52,15 +53,17 @@ named after [floccus](https://en.wikipedia.org/wiki/Cirrocumulus_floccus), the c
 go get github.com/floci-io/testcontainers-floci-go
 ```
 
-The module path is `github.com/floci-io/testcontainers-floci-go`. The AWS module is the `flociaws` package:
+The module path is `github.com/floci-io/testcontainers-floci-go`. Each cloud is a package of that one module: `flociaws`
+for AWS, `flociaz` for Azure:
 
 ```go
 import "github.com/floci-io/testcontainers-floci-go/flociaws"
+import "github.com/floci-io/testcontainers-floci-go/flociaz"
 ```
 
 The root package (`floci`, imported from the module path itself) is the original import path. It still
 works, as deprecated aliases of `flociaws`, so existing code keeps compiling; move to `flociaws` at your own
-pace. Other Floci clouds will arrive as sibling packages (`flociaz`, `flocigcp`, `flocioci`).
+pace. The remaining Floci clouds will arrive as sibling packages (`flocigcp`, `flocioci`).
 
 ## Quick start
 
@@ -174,6 +177,47 @@ func TestMain(m *testing.M) {
 - [`examples/sqs`](examples/sqs/) — queues, send and receive messages
 - [`examples/sns`](examples/sns/) — topics and subscriptions
 - [`examples/lambda`](examples/lambda/) — deploy and invoke a function
+
+### Azure
+
+The `flociaz` package starts the Floci Azure emulator (`floci/floci-az`) and follows the same conventions as
+`flociaws`: `Run`, package-level options, generic testcontainers options, `Reset`, a unique resource namespace and
+sibling-container cleanup on `Terminate`.
+
+```go
+package myservice_test
+
+import (
+    "context"
+    "testing"
+
+    "github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
+
+    "github.com/floci-io/testcontainers-floci-go/flociaz"
+    "github.com/testcontainers/testcontainers-go"
+)
+
+func TestBlob(t *testing.T) {
+    ctx := context.Background()
+
+    fc, err := flociaz.Run(ctx, "floci/floci-az:latest")
+    testcontainers.CleanupContainer(t, fc)
+    if err != nil {
+        t.Fatal(err)
+    }
+
+    client, err := azblob.NewClientFromConnectionString(fc.GetStorageConnectionString(), nil)
+    if err != nil {
+        t.Fatal(err)
+    }
+    if _, err := client.CreateContainer(ctx, "documents", nil); err != nil {
+        t.Fatal(err)
+    }
+    if _, err := client.UploadBuffer(ctx, "documents", "hello.txt", []byte("hello from floci"), nil); err != nil {
+        t.Fatal(err)
+    }
+}
+```
 
 ## Service configuration
 
@@ -328,6 +372,32 @@ fc, err := flociaws.Run(ctx, "floci/floci:latest",
 | `SsmConfig` | SSM Parameter Store |
 | `StepFunctionsConfig` | Step Functions |
 
+### Azure
+
+Every Azure service has a config struct with an `Enabled` switch, and a `Mocked` switch where the emulator has one;
+pass it with the matching `flociaz.With*Config` option. `flociaz.Default*Config()` returns the emulator's defaults.
+More typed settings will follow service by service; until then set them with `testcontainers.WithEnv`
+(`FLOCI_AZ_SERVICES_<SERVICE>_<SETTING>`). The service list is the emulator's
+[`ServicesConfig`](https://github.com/floci-io/floci-az/blob/main/src/main/java/io/floci/az/config/EmulatorConfig.java),
+one `<Service>Config` struct each; see the
+[package reference](https://pkg.go.dev/github.com/floci-io/testcontainers-floci-go/flociaz) for all of them.
+
+```go
+fc, err := flociaz.Run(ctx, "floci/floci-az:latest",
+    flociaz.WithRedisConfig(flociaz.RedisConfig{Enabled: true, Mocked: true}), // no Valkey container
+    flociaz.WithServiceBusConfig(flociaz.ServiceBusConfig{Enabled: true}),      // a real broker instead of the mock
+    flociaz.WithAksConfig(flociaz.AksConfig{Enabled: false}),
+)
+```
+
+Services that spawn sibling containers (ACR, AKS, Event Hubs, Functions, the MariaDB, MySQL and PostgreSQL databases,
+Redis) need the host Docker socket, and so do Service Bus, Container Instances, Container Apps and Virtual Machines
+once their `Mocked` switch is turned off (they are mocked by default), Cosmos DB with a MongoDB, PostgreSQL, Cassandra
+or Gremlin engine enabled, and SQL Database with the `managed` data plane. The module mounts the socket only while one
+of them needs it; `flociaz.WithDockerSocket(bool)` overrides the detection. The module also sets
+`FLOCI_AZ_DOCKER_ENDPOINT_MODE=published`, so the addresses the emulator reports for those containers are reachable
+from the test process, and `FLOCI_AZ_TLS_HTTPS_PORT=0`.
+
 ## Container options
 
 ```go
@@ -413,6 +483,28 @@ the same name:
 | `*flociaws.StartedFlociContainer` | `*flociaws.Container` (the old name is a deprecated alias) |
 | `fc.Stop(ctx)` | `testcontainers.CleanupContainer(t, fc)` in tests, or `fc.Terminate(ctx)` |
 
+### Azure
+
+`*flociaz.Container` gives the connection details of the Azure emulator:
+
+| Method | Returns |
+|---|---|
+| `GetEndpoint()` | `http://host:port`, the base URL of every Azure service |
+| `GetHTTPSEndpoint()` | `https://host:port`, served on the same port once TLS is enabled (`FLOCI_AZ_TLS_ENABLED=true`); `Run` then also waits for the HTTPS listener |
+| `GetTLSCertificate(ctx)` | PEM certificate to trust for the HTTPS endpoint; an error while TLS is disabled |
+| `GetSubscriptionID()` | Subscription ID (`00000000-0000-0000-0000-000000000001`) |
+| `GetTenantID()` | Microsoft Entra tenant ID (`00000000-0000-0000-0000-000000000002`) |
+| `GetAccountName()` | Storage account name (`devstoreaccount1`) |
+| `GetAccountKey()` | Storage account key (the Azurite development key) |
+| `GetBlobEndpoint()` | Blob Storage endpoint, `<endpoint>/devstoreaccount1` |
+| `GetQueueEndpoint()` | Queue Storage endpoint, `<endpoint>/devstoreaccount1-queue` |
+| `GetTableEndpoint()` | Table Storage endpoint, `<endpoint>/devstoreaccount1-table` |
+| `GetStorageConnectionString()` | Connection string with the three storage endpoints, for the Azure Storage SDKs |
+| `GetDedicatedNetworkName()` | Docker network name (empty if none) |
+| `GetMappedPort(ctx, port)` | Host port mapped from the given container port |
+| `GetResourceNamespace()` | Unique prefix (`tc-…`) of the sibling containers' names |
+| `Reset(ctx)` | Wipes all emulator state without restarting the container |
+
 ## Docker image tags
 
 By default the module runs the floating `latest` tag of the emulator image (`floci/floci:latest`), so you always test
@@ -422,6 +514,8 @@ against the current emulator. Pass a different image to `Run` to pin a release o
 flociaws.Run(ctx, "floci/floci:x.y.z")   // a specific release
 flociaws.Run(ctx, "floci/floci:nightly") // built from main every night
 ```
+
+The Azure module works the same way with `floci/floci-az` (`flociaz.Run(ctx, "floci/floci-az:x.y.z")`).
 
 Every emulator publishes `latest`, `x.y.z` and `nightly` tags. The AWS emulator also publishes a compat variant:
 
@@ -446,8 +540,8 @@ go test ./...                             # all tests
 go test -v -run TestRun_DefaultConfig .   # a single test
 ```
 
-Everything except `ports_internal_test.go` starts real Floci containers, so Docker must be running; the
-`floci/floci:latest` image is pulled automatically on first run.
+Everything except the `*_internal_test.go` files starts real Floci containers, so Docker must be running; the
+images are pulled automatically on first run.
 See [CONTRIBUTING.md](CONTRIBUTING.md) for the branching model and how to add a service.
 
 ## Other languages

@@ -1,11 +1,12 @@
 // Package core is the cloud-independent part of the Floci Testcontainers modules: one
-// cloud descriptor and one container lifecycle, shared by flociaws (and later flociaz,
+// cloud descriptor and one container lifecycle, shared by flociaws and flociaz (and later
 // flocigcp and flocioci).
 package core
 
 import (
 	"context"
 	"crypto/rand"
+	"crypto/tls"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -26,11 +27,16 @@ import (
 const DockerSocket = "/var/run/docker.sock"
 
 // SocketService is a service that spawns sibling containers and therefore needs the host
-// Docker socket. Token is the SCREAMING_SNAKE name in <prefix>SERVICES_<Token>_ENABLED; a
-// Mockable service spawns nothing while <prefix>SERVICES_<Token>_MOCK is true.
+// Docker socket. Token is the SCREAMING_SNAKE name in <prefix>SERVICES_<Token>_ENABLED. A
+// Mockable service spawns nothing while its mock setting (Descriptor.MockSetting) is true;
+// MockedByDefault says what an unset mock setting means. Needs, when set, is a further
+// condition on the service's own settings, for a service that spawns containers only in some
+// modes; setting returns the value of <prefix>SERVICES_<Token>_<name>, "" when unset.
 type SocketService struct {
-	Token    string
-	Mockable bool
+	Token           string
+	Mockable        bool
+	MockedByDefault bool
+	Needs           func(setting func(name string) string) bool
 }
 
 // HostSetting is a service setting that must name a host the test process can reach, such
@@ -54,6 +60,7 @@ type Descriptor struct {
 	HealthPath     string // answers 200 once the emulator is ready
 	ResetPath      string // wipes all state on POST; empty if the cloud has none
 	LogLevelEnv    string // env var that sets the emulator's log level
+	MockSetting    string // a service's mock switch; "MOCK" when empty
 	StartupTimeout time.Duration
 	SocketServices []SocketService
 	HostSettings   []HostSetting
@@ -68,6 +75,27 @@ func (d Descriptor) NetworkEnv() string { return d.EnvPrefix + "SERVICES_DOCKER_
 // ResourceNamespaceEnv prefixes sibling container names, keeping parallel runs apart.
 func (d Descriptor) ResourceNamespaceEnv() string { return d.EnvPrefix + "DOCKER_RESOURCE_NAMESPACE" }
 
+// TLSEnabledEnv turns TLS on: the emulator then serves HTTPS next to plain HTTP on its edge port.
+func (d Descriptor) TLSEnabledEnv() string { return d.EnvPrefix + "TLS_ENABLED" }
+
+// TLSEnabled reports whether env turns TLS on. It is off by default in every emulator.
+func (d Descriptor) TLSEnabled(env map[string]string) bool {
+	return strings.EqualFold(env[d.TLSEnabledEnv()], "true")
+}
+
+// healthWait waits for the health path to answer 200 on the edge port, over HTTPS when https is
+// set. The HTTPS probe does not validate the certificate, which is self-signed by default.
+func (d Descriptor) healthWait(https bool) *wait.HTTPStrategy {
+	strategy := wait.ForHTTP(d.HealthPath).
+		WithPort(d.PortSpec()).
+		WithStatusCodeMatcher(func(status int) bool { return status == http.StatusOK }).
+		WithStartupTimeout(d.StartupTimeout)
+	if https {
+		strategy = strategy.WithTLS(true, &tls.Config{InsecureSkipVerify: true}).WithAllowInsecure(true)
+	}
+	return strategy
+}
+
 // ServiceEnv is the env var of one service setting, e.g. ServiceEnv("SQS", "ENABLED").
 func (d Descriptor) ServiceEnv(token, setting string) string {
 	return d.EnvPrefix + "SERVICES_" + token + "_" + setting
@@ -76,12 +104,21 @@ func (d Descriptor) ServiceEnv(token, setting string) string {
 // DockerSocketRequired reports whether any enabled, non-mocked socket service in env spawns
 // sibling containers. A missing _ENABLED key means enabled, which is Floci's default.
 func (d Descriptor) DockerSocketRequired(env map[string]string) bool {
+	mockSetting := d.MockSetting
+	if mockSetting == "" {
+		mockSetting = "MOCK"
+	}
 	for _, svc := range d.SocketServices {
-		enabled, ok := env[d.ServiceEnv(svc.Token, "ENABLED")]
-		if ok && !strings.EqualFold(enabled, "true") {
+		if !d.serviceEnabled(env, svc.Token) {
 			continue
 		}
-		if svc.Mockable && strings.EqualFold(env[d.ServiceEnv(svc.Token, "MOCK")], "true") {
+		if svc.Mockable {
+			mocked, set := env[d.ServiceEnv(svc.Token, mockSetting)]
+			if (set && strings.EqualFold(mocked, "true")) || (!set && svc.MockedByDefault) {
+				continue
+			}
+		}
+		if svc.Needs != nil && !svc.Needs(func(name string) string { return env[d.ServiceEnv(svc.Token, name)] }) {
 			continue
 		}
 		return true
@@ -122,8 +159,9 @@ func (r Request) NeedsDockerSocket(env map[string]string) bool {
 
 // Options returns the customizers for testcontainers.Run: the module defaults, then the
 // caller's customizers, then a final step that sees the fully customized request. That last
-// step records the final environment and decides the Docker socket mount from it, so generic
-// options such as testcontainers.WithEnv cannot leave either out of sync with the emulator.
+// step records the final environment and decides the Docker socket mount and the HTTPS wait
+// from it, so generic options such as testcontainers.WithEnv cannot leave any of them out of
+// sync with the emulator.
 func (r Request) Options(network *testcontainers.DockerNetwork, customizers []testcontainers.ContainerCustomizer) ([]testcontainers.ContainerCustomizer, *map[string]string) {
 	d := r.Descriptor
 	exposedPorts := make([]string, 0, len(r.Ports))
@@ -134,10 +172,7 @@ func (r Request) Options(network *testcontainers.DockerNetwork, customizers []te
 	opts := []testcontainers.ContainerCustomizer{
 		testcontainers.WithExposedPorts(exposedPorts...),
 		testcontainers.WithEnv(maps.Clone(r.Env)),
-		testcontainers.WithWaitStrategy(wait.ForHTTP(d.HealthPath).
-			WithPort(d.PortSpec()).
-			WithStatusCodeMatcher(func(status int) bool { return status == http.StatusOK }).
-			WithStartupTimeout(d.StartupTimeout)),
+		testcontainers.WithWaitStrategy(d.healthWait(false)),
 	}
 	if network != nil {
 		opts = append(opts, tcnetwork.WithNetwork(nil, network))
@@ -150,6 +185,16 @@ func (r Request) Options(network *testcontainers.DockerNetwork, customizers []te
 			return err
 		}
 		finalEnv = maps.Clone(req.Env)
+		if d.TLSEnabled(req.Env) {
+			// With TLS on, the emulator answers plain HTTP a few hundred milliseconds before its
+			// HTTPS listener is up, and TLS handshakes fail in between. Wait for HTTPS as well,
+			// after whatever else the request waits for.
+			if req.WaitingFor == nil {
+				req.WaitingFor = d.healthWait(true)
+			} else {
+				req.WaitingFor = wait.ForAll(req.WaitingFor, d.healthWait(true))
+			}
+		}
 		if r.NeedsDockerSocket(req.Env) {
 			// Chain rather than replace, so a caller's WithHostConfigModifier still runs.
 			prev := req.HostConfigModifier
