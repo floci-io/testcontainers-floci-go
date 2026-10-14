@@ -1,7 +1,8 @@
-# Docker images the integration tests pin. The tests read floci/floci and floci/floci-az from
-# here (flociaws/images_test.go, flociaz/images_test.go) and CI pulls every line, so each tag is
-# declared once. One image:tag per line; '#' comments and blank lines are ignored. The library
-# defaults stay floci/floci:latest and floci/floci-az:latest; the examples use them too, as
-# user-facing code.
+# Docker images the integration tests pin. The tests read floci/floci, floci/floci-az and
+# floci/floci-gcp from here (the images_test.go of flociaws, flociaz and flocigcp) and CI pulls
+# every line, so each tag is declared once. One image:tag per line; '#' comments and blank lines
+# are ignored. The library defaults stay the floating latest tag of each image; the examples use
+# it too, as user-facing code.
 floci/floci:2.2.0
 floci/floci-az:0.14.0
+floci/floci-gcp:0.10.0
