@@ -31,8 +31,9 @@ A [Testcontainers for Go](https://golang.testcontainers.org) module for [Floci](
 open-source local cloud emulators. The `flociaws` package starts a Floci (AWS) container for your integration tests and
 gives you an endpoint and credentials to point the AWS SDK for Go v2 at, plus typed, per-service configuration structs
 over the emulator's environment variables. The `flociaz` package does the same for Floci Azure, with connection
-helpers for the Azure SDK for Go, and `flocigcp` for Floci GCP, with the emulator variables the Google Cloud client
-libraries read. No cloud account, no auth token.
+helpers for the Azure SDK for Go, `flocigcp` for Floci GCP, with the emulator variables the Google Cloud client
+libraries read, and `flocioci` for Floci OCI, with credentials the OCI SDK for Go accepts. No cloud account, no auth
+token.
 
 See the [Floci documentation](https://floci.io/floci/services/) for the full list of supported AWS services.
 
@@ -46,7 +47,7 @@ named after [floccus](https://en.wikipedia.org/wiki/Cirrocumulus_floccus), the c
 | [floci](https://github.com/floci-io/floci)         | AWS   | 4566 | ✅ [`floci` package](https://pkg.go.dev/github.com/floci-io/testcontainers-floci-go)        |
 | [floci-az](https://github.com/floci-io/floci-az)   | Azure | 4577 | ✅ [`flociaz` package](https://pkg.go.dev/github.com/floci-io/testcontainers-floci-go/flociaz) |
 | [floci-gcp](https://github.com/floci-io/floci-gcp) | GCP   | 4588 | ✅ [`flocigcp` package](https://pkg.go.dev/github.com/floci-io/testcontainers-floci-go/flocigcp) |
-| [floci-oci](https://github.com/floci-io/floci-oci) | OCI   | 4599 | Planned                                                                                    |
+| [floci-oci](https://github.com/floci-io/floci-oci) | OCI   | 4599 | ✅ [`flocioci` package](https://pkg.go.dev/github.com/floci-io/testcontainers-floci-go/flocioci) |
 
 ## Installation
 
@@ -55,17 +56,18 @@ go get github.com/floci-io/testcontainers-floci-go
 ```
 
 The module path is `github.com/floci-io/testcontainers-floci-go`. Each cloud is a package of that one module: `flociaws`
-for AWS, `flociaz` for Azure, `flocigcp` for GCP:
+for AWS, `flociaz` for Azure, `flocigcp` for GCP, `flocioci` for OCI:
 
 ```go
 import "github.com/floci-io/testcontainers-floci-go/flociaws"
 import "github.com/floci-io/testcontainers-floci-go/flociaz"
 import "github.com/floci-io/testcontainers-floci-go/flocigcp"
+import "github.com/floci-io/testcontainers-floci-go/flocioci"
 ```
 
 The root package (`floci`, imported from the module path itself) is the original import path. It still
 works, as deprecated aliases of `flociaws`, so existing code keeps compiling; move to `flociaws` at your own
-pace. The remaining Floci cloud will arrive as a sibling package (`flocioci`).
+pace.
 
 ## Quick start
 
@@ -263,6 +265,60 @@ func TestPubSub(t *testing.T) {
 
 Services without an emulator variable (BigQuery, Cloud Tasks, Cloud KMS, ...) take the endpoint explicitly, e.g.
 `option.WithEndpoint(fc.GetEndpoint())` with `option.WithoutAuthentication()`.
+
+### OCI
+
+The `flocioci` package starts the Floci OCI emulator (`floci/floci-oci`), again with the same conventions. The
+container hands out a complete set of API-key credentials, with a throwaway RSA key generated for it; the emulator
+reads the tenancy from a request's signature and never verifies the signature itself. Give every client the
+container's endpoint: the SDK otherwise derives a real OCI address from the region.
+
+```go
+package myservice_test
+
+import (
+    "context"
+    "testing"
+
+    "github.com/oracle/oci-go-sdk/v65/common"
+    "github.com/oracle/oci-go-sdk/v65/objectstorage"
+
+    "github.com/floci-io/testcontainers-floci-go/flocioci"
+    "github.com/testcontainers/testcontainers-go"
+)
+
+func TestObjectStorage(t *testing.T) {
+    ctx := context.Background()
+
+    fc, err := flocioci.Run(ctx, "floci/floci-oci:latest")
+    testcontainers.CleanupContainer(t, fc)
+    if err != nil {
+        t.Fatal(err)
+    }
+
+    provider := common.NewRawConfigurationProvider(fc.GetTenancyID(), fc.GetUserID(), fc.GetRegion(),
+        fc.GetFingerprint(), fc.GetPrivateKeyPEM(), nil)
+    client, err := objectstorage.NewObjectStorageClientWithConfigurationProvider(provider)
+    if err != nil {
+        t.Fatal(err)
+    }
+    client.Host = fc.GetEndpoint()
+
+    if _, err := client.CreateBucket(ctx, objectstorage.CreateBucketRequest{
+        NamespaceName: common.String(fc.GetNamespace()),
+        CreateBucketDetails: objectstorage.CreateBucketDetails{
+            Name:          common.String("documents"),
+            CompartmentId: common.String(fc.GetTenancyID()),
+        },
+    }); err != nil {
+        t.Fatal(err)
+    }
+}
+```
+
+For code that reads an OCI configuration file, `GetConfigFileContents(keyFile)` returns one with a `DEFAULT` profile
+(`GetConfigFileContents(keyFile, "FLOCI")` names it); write `GetPrivateKeyPEM()` to `keyFile` first, since a
+configuration file names its key by path.
 
 ## Service configuration
 
@@ -469,6 +525,30 @@ emulator serves HTTPS on the same port, and `Run` waits for that listener too. T
 emulator accepts any project ID, and `flocigcp.WithProjectID("my-project")` changes the default one, which
 `GetProjectID()` then returns.
 
+### OCI
+
+Every OCI service has a config struct with an `Enabled` switch, and a `Mock` switch where the emulator has one;
+pass it with the matching `flocioci.With*Config` option. `flocioci.Default*Config()` returns the emulator's defaults.
+More typed settings will follow service by service; until then set them with `testcontainers.WithEnv`
+(`FLOCI_OCI_SERVICES_<SERVICE>_<SETTING>`). The service list is the emulator's
+[`ServicesConfig`](https://github.com/floci-io/floci-oci/blob/main/src/main/java/io/floci/oci/config/EmulatorConfig.java),
+one `<Service>Config` struct each; see the
+[package reference](https://pkg.go.dev/github.com/floci-io/testcontainers-floci-go/flocioci) for all of them.
+
+```go
+fc, err := flocioci.Run(ctx, "floci/floci-oci:latest",
+    flocioci.WithFunctionsConfig(flocioci.FunctionsConfig{Enabled: true, Mock: true}), // no Fn server container
+    flocioci.WithOkeConfig(flocioci.OkeConfig{Enabled: false}),
+)
+```
+
+Functions and OKE spawn sibling containers and need the host Docker socket unless their `Mock` switch is on. The
+module mounts the socket only while one of them needs it; `flocioci.WithDockerSocket(bool)` overrides the detection.
+The module also sets `FLOCI_OCI_TLS_HTTPS_PORT=0`; with `FLOCI_OCI_TLS_ENABLED=true` the emulator serves HTTPS on the
+same port, and `Run` waits for that listener too. `flocioci.WithRegion`, `WithTenancyID` and
+`WithNamespace` change the region, default tenancy and Object Storage namespace, and the matching getters follow;
+`WithPrivateKeyPEM` supplies your own signing key instead of the generated one.
+
 ## Container options
 
 ```go
@@ -598,6 +678,25 @@ the same name:
 | `LOGGING_EMULATOR_HOST`, `KMS_EMULATOR_HOST` | `host:port`; no Google library reads these two, they are for code that builds the client endpoint from them, as the emulator's own compatibility tests do |
 | `GOOGLE_CLOUD_PROJECT` | The project ID |
 
+### OCI
+
+`*flocioci.Container` gives the connection details of the OCI emulator:
+
+| Method | Returns |
+|---|---|
+| `GetEndpoint()` | `http://host:port`, the base URL of every OCI service |
+| `GetRegion()` | Region (`us-ashburn-1`) |
+| `GetTenancyID()` | Tenancy OCID, also the root compartment (`ocid1.tenancy.oc1..flocilocaltenancy0…`) |
+| `GetNamespace()` | Object Storage namespace (`floci-local`) |
+| `GetUserID()` | User OCID to sign requests as (`ocid1.user.oc1..flocilocaluser0…`) |
+| `GetFingerprint()` | API key fingerprint (`aa:bb:cc:dd:ee:ff:00:11:22:33:44:55:66:77:88:99`, a placeholder) |
+| `GetPrivateKeyPEM()` | RSA private key in PEM form, generated for this container (or the one `WithPrivateKeyPEM` supplied) |
+| `GetConfigFileContents(keyFile, profile...)` | OCI configuration file (`~/.oci/config` format) with one profile (`DEFAULT` unless named) whose `key_file` is `keyFile` |
+| `GetDedicatedNetworkName()` | Docker network name (empty if none) |
+| `GetMappedPort(ctx, port)` | Host port mapped from the given container port |
+| `GetResourceNamespace()` | Unique prefix (`tc-…`) of the sibling containers' names |
+| `Reset(ctx)` | Wipes all emulator state without restarting the container |
+
 ## Docker image tags
 
 By default the module runs the floating `latest` tag of the emulator image (`floci/floci:latest`), so you always test
@@ -608,8 +707,9 @@ flociaws.Run(ctx, "floci/floci:x.y.z")   // a specific release
 flociaws.Run(ctx, "floci/floci:nightly") // built from main every night
 ```
 
-The Azure and GCP modules work the same way with `floci/floci-az` and `floci/floci-gcp`
-(`flociaz.Run(ctx, "floci/floci-az:x.y.z")`, `flocigcp.Run(ctx, "floci/floci-gcp:x.y.z")`).
+The Azure, GCP and OCI modules work the same way with `floci/floci-az`, `floci/floci-gcp` and `floci/floci-oci`
+(`flociaz.Run(ctx, "floci/floci-az:x.y.z")`, `flocigcp.Run(ctx, "floci/floci-gcp:x.y.z")`,
+`flocioci.Run(ctx, "floci/floci-oci:x.y.z")`).
 
 Every emulator publishes `latest`, `x.y.z` and `nightly` tags. The AWS emulator also publishes a compat variant:
 
