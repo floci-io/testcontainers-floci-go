@@ -1,6 +1,6 @@
 // Package core is the cloud-independent part of the Floci Testcontainers modules: one
-// cloud descriptor and one container lifecycle, shared by flociaws, flociaz and flocigcp (and
-// later flocioci).
+// cloud descriptor and one container lifecycle, shared by flociaws, flociaz, flocigcp and
+// flocioci.
 package core
 
 import (
