@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.2.0](https://github.com/floci-io/testcontainers-floci-go/compare/v1.1.0...v1.2.0) (2026-10-15)
+
+
+### Features
+
+* **az:** add the flociaz package for the Floci Azure emulator ([#31](https://github.com/floci-io/testcontainers-floci-go/issues/31)) ([0b1022b](https://github.com/floci-io/testcontainers-floci-go/commit/0b1022b0629b28bd72a7cfab67f4da5ec7007fb9))
+* **gcp:** add the flocigcp package for the Floci GCP emulator ([#33](https://github.com/floci-io/testcontainers-floci-go/issues/33)) ([a79f9ac](https://github.com/floci-io/testcontainers-floci-go/commit/a79f9ac4278c0bd4651dfc3569c8ed733e9d2ec1))
+* **oci:** add the flocioci package for the Floci OCI emulator ([#35](https://github.com/floci-io/testcontainers-floci-go/issues/35)) ([c376827](https://github.com/floci-io/testcontainers-floci-go/commit/c37682758f347f40cf06c753fd80786518ee3f2d))
+
 ## [1.1.0](https://github.com/floci-io/testcontainers-floci-go/compare/v1.0.0...v1.1.0) (2026-10-10)
 
 
