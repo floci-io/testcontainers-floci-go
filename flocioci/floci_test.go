@@ -293,7 +293,16 @@ func TestRun_SDKCredentials(t *testing.T) {
 	const otherTenancy = "ocid1.tenancy.oc1..someoneelse"
 	other := common.NewRawConfigurationProvider(otherTenancy, container.GetUserID(), container.GetRegion(),
 		container.GetFingerprint(), container.GetPrivateKeyPEM(), nil)
-	if got := sdkBuckets(t, storageClient(t, container, other), *ns.Value, otherTenancy); len(got) != 0 {
+	// Each tenancy has its own namespace, and the emulator answers 404 for anyone else's.
+	otherStorage := storageClient(t, container, other)
+	otherNs, err := otherStorage.GetNamespace(ctx, objectstorage.GetNamespaceRequest{})
+	if err != nil {
+		t.Fatalf("get namespace as another tenancy: %v", err)
+	}
+	if *otherNs.Value == *ns.Value {
+		t.Errorf("another tenancy shares namespace %q", *ns.Value)
+	}
+	if got := sdkBuckets(t, otherStorage, *otherNs.Value, otherTenancy); len(got) != 0 {
 		t.Errorf("buckets seen by another tenancy = %v", got)
 	}
 	if got := sdkBuckets(t, storageClient(t, container, raw), *ns.Value, container.GetTenancyID()); len(got) != 1 {
