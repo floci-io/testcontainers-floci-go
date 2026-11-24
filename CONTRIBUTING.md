@@ -2,7 +2,7 @@
 
 Thank you for your interest in contributing! This is a community-driven Testcontainers module for Floci and all contributions are welcome. By participating, you agree to abide by our [Code of Conduct](CODE_OF_CONDUCT.md).
 
-**Join us on [Slack](https://join.slack.com/t/floci/shared_invite/zt-3tjn02s3q-A00kEjJ1cZxsg_imTfy6Cw)**: it is the fastest way to reach maintainers.
+**Join us on [Slack](https://floci.io/slack)**: it is the fastest way to reach maintainers.
 
 ## Ways to Contribute
 
